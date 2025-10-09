@@ -133,9 +133,6 @@ const DebatePage = () => {
     );
   }
 
-  const debaterA = participants.debater_a;
-  const debaterB = participants.debater_b;
-
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)' }}>
       {/* Animated Background */}
