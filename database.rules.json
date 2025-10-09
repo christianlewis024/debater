@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "activeViewers": {
+      "$debateId": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    }
+  }
+}
