@@ -413,13 +413,12 @@ const VideoDebateRoom = ({
       !joined &&
       !joining &&
       debateId &&
-      !hasJoinedRef.current &&
-      isDebater
+      !hasJoinedRef.current
     ) {
       const timer = setTimeout(() => joinChannel(), 1000);
       return () => clearTimeout(timer);
     }
-  }, [currentUser, debateId, isDebater]);
+  }, [currentUser, debateId]);
 
   useEffect(() => {
     return () => {
