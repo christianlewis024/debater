@@ -188,10 +188,10 @@ const VideoDebateRoom = ({
     const handleUserPublished = async (user, mediaType) => {
       try {
         await client.subscribe(user, mediaType);
+        // Always update the user in state to ensure React re-renders with new tracks
         setRemoteUsers((prev) => {
-          const exists = prev.find((u) => u.uid === user.uid);
-          if (exists) return prev;
-          return [...prev, user];
+          const filtered = prev.filter((u) => u.uid !== user.uid);
+          return [...filtered, user];
         });
       } catch (error) {
         console.error("Error subscribing:", error);

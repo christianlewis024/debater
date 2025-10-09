@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   updateDoc,
+  setDoc,
   query,
   where,
   orderBy,
@@ -157,8 +158,9 @@ export const subscribeToDebates = (callback, filters = {}) => {
 // Join debate as participant
 export const joinDebate = async (debateId, userId, userProfile, side, sideDescription) => {
   try {
-    const participantsRef = collection(db, `debates/${debateId}/participants`);
-    await addDoc(participantsRef, {
+    // Use the role as the document ID so each role can only have one person
+    const participantDocRef = doc(db, `debates/${debateId}/participants`, side);
+    await setDoc(participantDocRef, {
       userId: userId,
       role: side,
       sideDescription: sideDescription,
