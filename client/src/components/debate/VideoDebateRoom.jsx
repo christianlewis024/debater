@@ -178,7 +178,7 @@ const VideoDebateRoom = ({
 
   useEffect(() => {
     if (isDebater) getDevices();
-  }, [isDebater, getDevices]); // Added getDevices to dependency array
+  }, [isDebater]);
 
   useEffect(() => {
     if (!client) return;
@@ -419,14 +419,14 @@ const VideoDebateRoom = ({
       const timer = setTimeout(() => joinChannel(), 1000);
       return () => clearTimeout(timer);
     }
-  }, [currentUser, debateId, isDebater, joinChannel]); // Added joinChannel to dependency array
+  }, [currentUser, debateId, isDebater]);
 
   useEffect(() => {
     return () => {
       if (joined || hasJoinedRef.current) leaveChannel();
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [leaveChannel]); // Added leaveChannel to dependency array
+  }, []);
 
   useEffect(() => {
     remoteUsers.forEach((user) => {

@@ -20,7 +20,7 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
 
     const interval = setInterval(loadVotes, 5000);
     return () => clearInterval(interval);
-  }, [debateId, currentUser, loadVotes, checkIfVoted]); // Added loadVotes and checkIfVoted to dependency array
+  }, [debateId, currentUser]);
 
   const loadVotes = async () => {
     try {
