@@ -18,8 +18,19 @@ const DebatePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [joinSide, setJoinSide] = useState('debater_a');
+  const [joinSide, setJoinSide] = useState('');
   const [sideDescription, setSideDescription] = useState('');
+
+  // Set default join side based on available slots
+  useEffect(() => {
+    if (!debaterA) {
+      setJoinSide('debater_a');
+    } else if (!debaterB) {
+      setJoinSide('debater_b');
+    } else {
+      setJoinSide('moderator');
+    }
+  }, [participants]);
 
   useEffect(() => {
     if (!debateId) return;

@@ -33,6 +33,7 @@ const VideoDebateRoom = ({
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const videoContainerRef = useRef(null);
 
   const [cameras, setCameras] = useState([]);
@@ -188,6 +189,17 @@ const VideoDebateRoom = ({
     const handleUserPublished = async (user, mediaType) => {
       try {
         await client.subscribe(user, mediaType);
+        
+        // If audio track, try to play it (browsers may block without user interaction)
+        if (mediaType === 'audio' && user.audioTrack) {
+          try {
+            await user.audioTrack.play();
+          } catch (audioError) {
+            console.log('Audio autoplay blocked, will play on user interaction:', audioError);
+            setAudioBlocked(true);
+          }
+        }
+        
         // Always update the user in state to ensure React re-renders with new tracks
         setRemoteUsers((prev) => {
           const filtered = prev.filter((u) => u.uid !== user.uid);
@@ -374,6 +386,20 @@ const VideoDebateRoom = ({
         document.msExitFullscreen();
       }
       setIsFullscreen(false);
+    }
+  };
+
+  const enableAudio = async () => {
+    // Try to play all remote audio tracks
+    for (const user of remoteUsers) {
+      if (user.audioTrack) {
+        try {
+          await user.audioTrack.play();
+          setAudioBlocked(false);
+        } catch (error) {
+          console.error('Failed to play audio:', error);
+        }
+      }
     }
   };
 
@@ -883,6 +909,48 @@ const VideoDebateRoom = ({
           }}
         >
           {error}
+        </div>
+      )}
+
+      {audioBlocked && (
+        <div
+          style={{
+            margin: "20px 24px 0",
+            background: "rgba(245, 158, 11, 0.15)",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: "12px",
+            padding: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px"
+          }}
+        >
+          <div>
+            <div style={{ color: "#fbbf24", fontWeight: "700", fontSize: "14px", marginBottom: "4px" }}>
+              🔇 Audio Blocked
+            </div>
+            <div style={{ color: "#fcd34d", fontSize: "13px" }}>
+              Click the button to enable audio playback
+            </div>
+          </div>
+          <button
+            onClick={enableAudio}
+            style={{
+              padding: "10px 20px",
+              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+              color: "#fff",
+              borderRadius: "10px",
+              fontWeight: "700",
+              fontSize: "14px",
+              border: "none",
+              cursor: "pointer",
+              boxShadow: "0 4px 15px rgba(245, 158, 11, 0.4)",
+              whiteSpace: "nowrap"
+            }}
+          >
+            🔊 Enable Audio
+          </button>
         </div>
       )}
 
