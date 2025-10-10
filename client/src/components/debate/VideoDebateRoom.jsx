@@ -188,14 +188,17 @@ const VideoDebateRoom = ({
 
     const handleUserPublished = async (user, mediaType) => {
       try {
+        console.log('📡 Remote user published:', { uid: user.uid, mediaType });
         await client.subscribe(user, mediaType);
         
         // If audio track, try to play it (browsers may block without user interaction)
         if (mediaType === 'audio' && user.audioTrack) {
+          console.log('🔊 Attempting to play remote audio');
           try {
             await user.audioTrack.play();
+            console.log('✅ Audio playing successfully');
           } catch (audioError) {
-            console.log('Audio autoplay blocked, will play on user interaction:', audioError);
+            console.log('⚠️ Audio autoplay blocked:', audioError.message);
             setAudioBlocked(true);
           }
         }
@@ -205,8 +208,10 @@ const VideoDebateRoom = ({
           const filtered = prev.filter((u) => u.uid !== user.uid);
           return [...filtered, user];
         });
+        
+        console.log('✅ Subscribed to', mediaType, 'from user', user.uid);
       } catch (error) {
-        console.error("Error subscribing:", error);
+        console.error("❌ Error subscribing:", error);
       }
     };
 
@@ -314,11 +319,24 @@ const VideoDebateRoom = ({
       // Publish whatever tracks are available
       if (isDebater) {
         const tracksToPublish = [];
-        if (audioTrack) tracksToPublish.push(audioTrack);
-        if (videoTrack) tracksToPublish.push(videoTrack);
+        if (audioTrack) {
+          tracksToPublish.push(audioTrack);
+          console.log('🎤 Publishing audio track');
+        } else {
+          console.log('⚠️ No audio track to publish');
+        }
+        if (videoTrack) {
+          tracksToPublish.push(videoTrack);
+          console.log('📹 Publishing video track');
+        } else {
+          console.log('⚠️ No video track to publish');
+        }
         
         if (tracksToPublish.length > 0) {
           await client.publish(tracksToPublish);
+          console.log('✅ Successfully published', tracksToPublish.length, 'track(s)');
+        } else {
+          console.log('⚠️ No tracks to publish');
         }
       }
 

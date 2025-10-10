@@ -44,6 +44,7 @@ const DebatePage = () => {
     });
 
     const unsubParticipants = subscribeToParticipants(debateId, (participantsData) => {
+      console.log('👥 Participants updated:', participantsData);
       setParticipants(participantsData);
     });
 
@@ -70,6 +71,13 @@ const DebatePage = () => {
       return;
     }
 
+    console.log('🎯 Attempting to join debate:', {
+      debateId,
+      userId: currentUser.uid,
+      role: joinSide,
+      currentParticipants: participants
+    });
+
     try {
       await joinDebate(
         debateId,
@@ -78,11 +86,35 @@ const DebatePage = () => {
         joinSide,
         sideDescription
       );
+      console.log('✅ Successfully joined as:', joinSide);
       setShowJoinModal(false);
       setSideDescription('');
     } catch (error) {
-      console.error('Error joining debate:', error);
+      console.error('❌ Error joining debate:', error);
       setError('Failed to join debate');
+    }
+  };
+
+  const cleanupParticipants = async () => {
+    if (!window.confirm('This will remove ALL participants from this debate. Continue?')) {
+      return;
+    }
+    try {
+      const { collection, getDocs, deleteDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../services/firebase');
+      
+      const participantsRef = collection(db, `debates/${debateId}/participants`);
+      const snapshot = await getDocs(participantsRef);
+      
+      for (const document of snapshot.docs) {
+        await deleteDoc(doc(db, `debates/${debateId}/participants`, document.id));
+        console.log('🗑️ Deleted participant:', document.id);
+      }
+      
+      alert('All participants cleared!');
+    } catch (error) {
+      console.error('Error cleaning up:', error);
+      alert('Failed to cleanup: ' + error.message);
     }
   };
 
@@ -336,11 +368,33 @@ const DebatePage = () => {
                   fontSize: '15px',
                   border: '1px solid rgba(59, 130, 246, 0.2)',
                   cursor: 'pointer',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  marginBottom: '12px'
                 }}
               >
                 ← Back to Browse
               </button>
+              
+              {/* Debug: Cleanup Button */}
+              {currentUser && (
+                <button
+                  onClick={cleanupParticipants}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    borderRadius: '12px',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  🗑️ Clear All Participants (Debug)
+                </button>
+              )}
             </div>
           </div>
         </div>
