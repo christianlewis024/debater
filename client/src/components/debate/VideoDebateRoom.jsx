@@ -246,15 +246,28 @@ const VideoDebateRoom = ({
   }, [client]);
 
   const createTracks = async () => {
-    const audioConfig = selectedMicrophone
-      ? { microphoneId: selectedMicrophone }
-      : {};
-    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack(audioConfig);
+    let audioTrack = null;
+    let videoTrack = null;
 
-    const videoConfig = selectedCamera
-      ? { cameraId: selectedCamera, encoderConfig: "720p_2" }
-      : { encoderConfig: "720p_2" };
-    const videoTrack = await AgoraRTC.createCameraVideoTrack(videoConfig);
+    // Try to create audio track
+    try {
+      const audioConfig = selectedMicrophone
+        ? { microphoneId: selectedMicrophone }
+        : {};
+      audioTrack = await AgoraRTC.createMicrophoneAudioTrack(audioConfig);
+    } catch (error) {
+      console.log('Could not create audio track:', error);
+    }
+
+    // Try to create video track
+    try {
+      const videoConfig = selectedCamera
+        ? { cameraId: selectedCamera, encoderConfig: "720p_2" }
+        : { encoderConfig: "720p_2" };
+      videoTrack = await AgoraRTC.createCameraVideoTrack(videoConfig);
+    } catch (error) {
+      console.log('Could not create video track:', error);
+    }
 
     return { audioTrack, videoTrack };
   };
@@ -272,30 +285,41 @@ const VideoDebateRoom = ({
       let videoTrack = null;
 
       if (isDebater) {
-        try {
-          const tracks = await createTracks();
-          audioTrack = tracks.audioTrack;
-          videoTrack = tracks.videoTrack;
+      const tracks = await createTracks();
+      audioTrack = tracks.audioTrack;
+      videoTrack = tracks.videoTrack;
 
-          setLocalAudioTrack(audioTrack);
-          setLocalVideoTrack(videoTrack);
-
-          if (localVideoContainerRef.current) {
-            localVideoContainerRef.current.innerHTML = "";
-            videoTrack.play(localVideoContainerRef.current);
-          }
-        } catch (trackError) {
-          setError("Failed to access camera/microphone.");
-          setJoining(false);
-          hasJoinedRef.current = false;
-          return;
-        }
+      // Set tracks if they were created
+      if (audioTrack) setLocalAudioTrack(audioTrack);
+      if (videoTrack) {
+        setLocalVideoTrack(videoTrack);
+      if (localVideoContainerRef.current) {
+      localVideoContainerRef.current.innerHTML = "";
+      videoTrack.play(localVideoContainerRef.current);
       }
+      }
+
+      // Show a message if no camera/mic available
+      if (!audioTrack && !videoTrack) {
+      setError("No camera or microphone detected. You can still join, but others won't see or hear you.");
+      } else if (!videoTrack) {
+          setError("No camera detected. Others will see your profile picture.");
+      } else if (!audioTrack) {
+        setError("No microphone detected. Others can see you but not hear you.");
+      }
+    }
 
       await client.join(appId, debateId, null, currentUser.uid);
 
-      if (isDebater && audioTrack && videoTrack) {
-        await client.publish([audioTrack, videoTrack]);
+      // Publish whatever tracks are available
+      if (isDebater) {
+        const tracksToPublish = [];
+        if (audioTrack) tracksToPublish.push(audioTrack);
+        if (videoTrack) tracksToPublish.push(videoTrack);
+        
+        if (tracksToPublish.length > 0) {
+          await client.publish(tracksToPublish);
+        }
       }
 
       setJoined(true);
@@ -977,10 +1001,37 @@ const VideoDebateRoom = ({
                   ...getBorderStyle(localSpeaking, isMyTurn),
                 }}
               >
-                <div
-                  ref={localVideoContainerRef}
-                  style={{ width: "100%", height: "100%" }}
-                />
+                {localVideoTrack ? (
+                  <div
+                    ref={localVideoContainerRef}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                ) : (
+                  // Show profile picture if no video
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                    }}
+                  >
+                    <img
+                      src={userProfile?.photoURL}
+                      alt={userProfile?.username}
+                      style={{
+                        width: "40%",
+                        height: "40%",
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "4px solid rgba(59, 130, 246, 0.5)",
+                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                      }}
+                    />
+                  </div>
+                )}
                 {localVideoTrack && (
                   <div
                     style={{
@@ -1022,30 +1073,33 @@ const VideoDebateRoom = ({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      flexDirection: "column",
                       background:
                         "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
                     }}
                   >
-                    <div style={{ textAlign: "center" }}>
-                      <div
-                        style={{
-                          fontSize: "48px",
-                          marginBottom: "12px",
-                          opacity: 0.5,
-                        }}
-                      >
-                        📹
-                      </div>
-                      <p
-                        style={{
-                          color: "#64748b",
-                          fontSize: "14px",
-                          fontWeight: "500",
-                        }}
-                      >
-                        Loading camera...
-                      </p>
-                    </div>
+                    <img
+                      src={userProfile?.photoURL}
+                      alt={userProfile?.username}
+                      style={{
+                        width: "120px",
+                        height: "120px",
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "4px solid rgba(59, 130, 246, 0.5)",
+                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                        marginBottom: "16px",
+                      }}
+                    />
+                    <p
+                      style={{
+                        color: "#64748b",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {joining ? "Connecting..." : "No camera detected"}
+                    </p>
                   </div>
                 )}
               </div>
@@ -1172,10 +1226,39 @@ const VideoDebateRoom = ({
                       ...getBorderStyle(remoteSpeaking[user.uid], !isMyTurn),
                     }}
                   >
-                    <div
-                      id={`remote-video-${user.uid}`}
-                      style={{ width: "100%", height: "100%" }}
-                    />
+                    {user.videoTrack ? (
+                      <div
+                        id={`remote-video-${user.uid}`}
+                        style={{ width: "100%", height: "100%" }}
+                      />
+                    ) : (
+                      // Show profile picture if no video
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                        }}
+                      >
+                        <img
+                          src={remoteDebater?.profileData?.photoURL}
+                          alt={remoteDebater?.profileData?.username}
+                          style={{
+                            width: "40%",
+                            height: "40%",
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            border: isDebaterA
+                              ? "4px solid rgba(59, 130, 246, 0.5)"
+                              : "4px solid rgba(239, 68, 68, 0.5)",
+                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                          }}
+                        />
+                      </div>
+                    )}
                     <div
                       style={{
                         position: "absolute",
