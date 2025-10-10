@@ -148,6 +148,33 @@ const VideoDebateRoom = ({
     };
   }, [debateState, debateId]);
 
+  // Auto-mute/unmute based on turns
+  useEffect(() => {
+    if (!debateState || !debateState.debateStarted || debateState.debateEnded) {
+      return;
+    }
+
+    // Only control audio for debaters, not moderators
+    if (myRole === 'debater_a' || myRole === 'debater_b') {
+      if (isMyTurn) {
+        // It's my turn - unmute if I was muted
+        if (micMuted && localAudioTrack) {
+          localAudioTrack.setEnabled(true);
+          setMicMuted(false);
+          console.log('🎤 Auto-unmuted: Your turn to speak');
+        }
+      } else {
+        // Not my turn - mute
+        if (!micMuted && localAudioTrack) {
+          localAudioTrack.setEnabled(false);
+          setMicMuted(true);
+          console.log('🔇 Auto-muted: Waiting for your turn');
+        }
+      }
+    }
+    // Moderator is never auto-muted
+  }, [debateState?.currentTurn, isMyTurn, myRole, localAudioTrack]);
+
   const handleStartDebate = async () => {
     if (debateState && !debateState.debateStarted) {
       await startDebate(debateId);
@@ -393,6 +420,12 @@ const VideoDebateRoom = ({
 
   const toggleMic = async () => {
     if (localAudioTrack) {
+      // Check if it's not my turn (debaters only)
+      if ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) {
+        // Don't allow unmuting if it's not your turn
+        return;
+      }
+      
       const newState = !micMuted;
       await localAudioTrack.setEnabled(!newState);
       setMicMuted(newState);
@@ -771,24 +804,28 @@ const VideoDebateRoom = ({
             <>
               <button
                 onClick={toggleMic}
+                disabled={(myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted}
                 style={{
                   padding: "10px 16px",
                   borderRadius: "10px",
                   fontWeight: "600",
                   fontSize: "14px",
                   border: "none",
-                  cursor: "pointer",
+                  cursor: ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? "not-allowed" : "pointer",
                   transition: "all 0.2s ease",
                   background: micMuted
                     ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+                    : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted)
+                    ? "rgba(100, 116, 139, 0.3)"
                     : "rgba(255, 255, 255, 0.1)",
                   color: "#fff",
+                  opacity: ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? 0.5 : 1,
                   boxShadow: micMuted
                     ? "0 4px 15px rgba(239, 68, 68, 0.4)"
                     : "none",
                 }}
               >
-                {micMuted ? "🔇" : "🎤"}
+                {micMuted ? "🔇" : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? "🔒🎤" : "🎤"}
               </button>
               <button
                 onClick={toggleCamera}

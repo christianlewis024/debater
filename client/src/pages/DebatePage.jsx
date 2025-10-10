@@ -23,6 +23,7 @@ const DebatePage = () => {
 
   const debaterA = participants.debater_a;
   const debaterB = participants.debater_b;
+  const moderator = participants.moderator;
 
   // Set default join side based on available slots
   useEffect(() => {
@@ -30,10 +31,13 @@ const DebatePage = () => {
       setJoinSide('debater_a');
     } else if (!debaterB) {
       setJoinSide('debater_b');
-    } else {
+    } else if (!moderator) {
       setJoinSide('moderator');
+    } else {
+      // All slots filled
+      setJoinSide('');
     }
-  }, [debaterA, debaterB]);
+  }, [debaterA, debaterB, moderator]);
 
   useEffect(() => {
     if (!debateId) return;
@@ -476,7 +480,10 @@ const DebatePage = () => {
               >
                 {!debaterA && <option value="debater_a">Debater A (Pro)</option>}
                 {!debaterB && <option value="debater_b">Debater B (Con)</option>}
-                <option value="moderator">Moderator</option>
+                {!moderator && <option value="moderator">Moderator</option>}
+                {debaterA && debaterB && moderator && (
+                  <option value="" disabled>All slots filled</option>
+                )}
               </select>
             </div>
 
@@ -532,17 +539,23 @@ const DebatePage = () => {
               </button>
               <button
                 onClick={handleJoinDebate}
+                disabled={!joinSide || (debaterA && debaterB && moderator)}
                 style={{
                   flex: 1,
                   padding: '14px 24px',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  background: (!joinSide || (debaterA && debaterB && moderator)) 
+                    ? 'rgba(100, 116, 139, 0.3)' 
+                    : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   color: '#fff',
                   borderRadius: '12px',
                   fontWeight: '700',
                   fontSize: '15px',
                   border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+                  cursor: (!joinSide || (debaterA && debaterB && moderator)) ? 'not-allowed' : 'pointer',
+                  boxShadow: (!joinSide || (debaterA && debaterB && moderator)) 
+                    ? 'none' 
+                    : '0 4px 15px rgba(59, 130, 246, 0.4)',
+                  opacity: (!joinSide || (debaterA && debaterB && moderator)) ? 0.5 : 1,
                   transition: 'all 0.2s ease'
                 }}
               >
