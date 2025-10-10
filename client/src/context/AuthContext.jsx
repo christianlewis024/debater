@@ -60,7 +60,9 @@ export const AuthProvider = ({ children }) => {
       stats: {
         totalDebates: 0,
         wins: 0,
-        losses: 0
+        losses: 0,
+        totalVotesReceived: 0, // New: track total votes across all debates
+        totalVotesCast: 0 // New: track how many votes they've cast
       }
     });
 
@@ -96,7 +98,9 @@ export const AuthProvider = ({ children }) => {
         stats: {
           totalDebates: 0,
           wins: 0,
-          losses: 0
+          losses: 0,
+          totalVotesReceived: 0,
+          totalVotesCast: 0
         }
       });
     } else {

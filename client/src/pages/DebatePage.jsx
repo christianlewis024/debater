@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToDebate, joinDebate } from '../services/debateService';
 import { subscribeToParticipants, joinAsViewer, subscribeToViewerCount } from '../services/chatService';
+import { subscribeToDebateState } from '../services/debateStateService';
+import { handleDebateEnd, scheduleDebateDeletion } from '../services/debateEndService';
 import ChatPanel from '../components/debate/ChatPanel';
 import VotingPanel from '../components/debate/VotingPanel';
 import VideoDebateRoom from '../components/debate/VideoDebateRoom';
@@ -14,6 +16,7 @@ const DebatePage = () => {
 
   const [debate, setDebate] = useState(null);
   const [participants, setParticipants] = useState({});
+  const [debateState, setDebateState] = useState(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,6 +59,10 @@ const DebatePage = () => {
       setViewerCount(count);
     });
 
+    const unsubDebateState = subscribeToDebateState(debateId, (state) => {
+      setDebateState(state);
+    });
+
     let leaveViewer;
     if (currentUser) {
       leaveViewer = joinAsViewer(debateId, currentUser.uid);
@@ -65,9 +72,36 @@ const DebatePage = () => {
       unsubDebate();
       unsubParticipants();
       unsubViewers();
+      unsubDebateState();
       if (leaveViewer) leaveViewer();
     };
   }, [debateId, currentUser]);
+
+  // Handle debate end - count votes and schedule cleanup
+  useEffect(() => {
+    const handleEnd = async () => {
+      if (!debateState || !debateState.debateEnded || !debateId) return;
+      
+      // Check if already processed
+      if (debate?.status === 'completed') return;
+      
+      console.log('🏁 Debate ended - starting 30 minute voting period');
+      
+      try {
+        // Calculate winner and update stats
+        await handleDebateEnd(debateId);
+        
+        // Schedule deletion in 30 minutes
+        await scheduleDebateDeletion(debateId, 30);
+        
+        console.log('✅ Debate results processed, will be deleted in 30 minutes');
+      } catch (error) {
+        console.error('❌ Error processing debate end:', error);
+      }
+    };
+    
+    handleEnd();
+  }, [debateState?.debateEnded, debateId, debate?.status]);
 
   const handleJoinDebate = async () => {
     if (!currentUser) {

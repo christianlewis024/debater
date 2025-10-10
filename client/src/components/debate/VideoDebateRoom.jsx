@@ -378,6 +378,9 @@ const VideoDebateRoom = ({
 
   const leaveChannel = async () => {
     try {
+      console.log('👋 Leaving Agora channel and cleaning up tracks...');
+      
+      // Stop and close local tracks
       if (localAudioTrack) {
         localAudioTrack.stop();
         localAudioTrack.close();
@@ -388,13 +391,25 @@ const VideoDebateRoom = ({
         localVideoTrack.close();
         setLocalVideoTrack(null);
       }
-      if (client && joined) await client.leave();
+      
+      // Stop all remote tracks
+      remoteUsers.forEach(user => {
+        if (user.audioTrack) user.audioTrack.stop();
+        if (user.videoTrack) user.videoTrack.stop();
+      });
+      
+      // Leave Agora channel
+      if (client && joined) {
+        await client.leave();
+      }
 
       setJoined(false);
       setRemoteUsers([]);
       hasJoinedRef.current = false;
+      
+      console.log('✅ Successfully left channel and cleaned up');
     } catch (err) {
-      console.error("Error leaving:", err);
+      console.error("❌ Error leaving:", err);
     }
   };
 
@@ -520,6 +535,28 @@ const VideoDebateRoom = ({
       return () => clearTimeout(timer);
     }
   }, [currentUser, debateId]);
+
+  // Auto-rejoin when user becomes a debater
+  const prevIsDebaterRef = useRef(isDebater);
+  useEffect(() => {
+    const wasDebater = prevIsDebaterRef.current;
+    const isNowDebater = isDebater;
+    
+    // If user just became a debater, rejoin to get proper tracks
+    if (!wasDebater && isNowDebater && joined) {
+      console.log('🔄 User became debater - rejoining with video/audio...');
+      const rejoin = async () => {
+        await leaveChannel();
+        setTimeout(() => {
+          hasJoinedRef.current = false;
+          joinChannel();
+        }, 1000);
+      };
+      rejoin();
+    }
+    
+    prevIsDebaterRef.current = isDebater;
+  }, [isDebater, joined]);
 
   useEffect(() => {
     return () => {
