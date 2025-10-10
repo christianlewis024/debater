@@ -81,7 +81,11 @@ const VideoDebateRoom = ({
 
     const unsubscribe = subscribeToDebateState(debateId, (state) => {
       setDebateState(state);
-      if (state) {
+      // Only update timeRemaining if it's a new turn or debate just started
+      if (state && state.timeRemaining && 
+          (!debateState || 
+           state.turnNumber !== debateState.turnNumber || 
+           (!debateState.debateStarted && state.debateStarted))) {
         setTimeRemaining(state.timeRemaining);
       }
     });
@@ -1203,8 +1207,8 @@ const VideoDebateRoom = ({
                   </div>
                 )}
               </div>
-              {/* Debater Info Card */}
-              {myRole &&
+              {/* Only show card for debaters, not moderators */}
+              {myRole && myRole !== 'moderator' &&
                 (myRole === "debater_a"
                   ? participants.debater_a
                   : participants.debater_b) && (
