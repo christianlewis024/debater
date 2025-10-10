@@ -305,7 +305,7 @@ const DebatePage = () => {
             />
 
             {/* Waiting State */}
-            {debate.status === 'waiting' && (!debaterA || !debaterB) && (
+            {debate.status === 'waiting' && (!debaterA || !debaterB || !moderator) && (
               <div style={{ 
                 background: 'rgba(17, 24, 39, 0.6)', 
                 backdropFilter: 'blur(20px)',
@@ -323,28 +323,38 @@ const DebatePage = () => {
                   marginBottom: '12px',
                   letterSpacing: '-0.02em'
                 }}>
-                  Waiting for Debaters
+                  {(!debaterA || !debaterB) ? 'Waiting for Debaters' : 'Waiting for Moderator'}
                 </h2>
                 <p style={{ color: '#94a3b8', marginBottom: '32px', fontSize: '16px', fontWeight: '500' }}>
-                  {!debaterA && !debaterB ? 'Need 2 debaters to start' : 'Need 1 more debater to start'}
+                  {!debaterA && !debaterB ? 'Need 2 debaters to start' : 
+                   (!debaterA || !debaterB) ? 'Need 1 more debater' :
+                   'Moderator needed to oversee the debate'}
                 </p>
                 {currentUser ? (
                   <button
                     onClick={() => setShowJoinModal(true)}
+                    disabled={debaterA && debaterB && moderator}
                     style={{
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      background: (debaterA && debaterB && moderator) 
+                        ? 'rgba(100, 116, 139, 0.3)'
+                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       color: '#fff',
                       padding: '16px 48px',
                       borderRadius: '14px',
                       fontWeight: '700',
                       fontSize: '17px',
                       border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 8px 30px rgba(59, 130, 246, 0.4)',
+                      cursor: (debaterA && debaterB && moderator) ? 'not-allowed' : 'pointer',
+                      boxShadow: (debaterA && debaterB && moderator) 
+                        ? 'none' 
+                        : '0 8px 30px rgba(59, 130, 246, 0.4)',
+                      opacity: (debaterA && debaterB && moderator) ? 0.5 : 1,
                       transition: 'all 0.3s ease'
                     }}
                   >
-                    Join as Debater
+                    {(!debaterA || !debaterB) ? 'Join as Debater' : 
+                     !moderator ? 'Join as Moderator' :
+                     'All Slots Filled'}
                   </button>
                 ) : (
                   <button
