@@ -67,10 +67,11 @@ export const endDebate = async (debateId) => {
   });
 };
 
-// Pause debate (moderator only)
-export const pauseDebate = async (debateId) => {
+// Pause debate (moderator only) - save current time
+export const pauseDebate = async (debateId, currentTimeRemaining) => {
   await updateDoc(doc(db, 'debateStates', debateId), {
     paused: true,
+    timeRemaining: currentTimeRemaining, // Save the current time
     lastUpdate: new Date()
   });
 };

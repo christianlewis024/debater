@@ -358,15 +358,19 @@ const VideoDebateRoom = ({
       // Publish whatever tracks are available
       if (needsMedia) {
         const tracksToPublish = [];
-        if (audioTrack) {
+        if (audioTrack && audioTrack.enabled) {
           tracksToPublish.push(audioTrack);
           console.log('🎤 Publishing audio track');
+        } else if (audioTrack) {
+          console.log('⚠️ Audio track disabled, not publishing');
         } else {
           console.log('⚠️ No audio track to publish');
         }
-        if (videoTrack) {
+        if (videoTrack && videoTrack.enabled) {
           tracksToPublish.push(videoTrack);
           console.log('📹 Publishing video track');
+        } else if (videoTrack) {
+          console.log('⚠️ Video track disabled, not publishing');
         } else {
           console.log('⚠️ No video track to publish');
         }
@@ -548,15 +552,15 @@ const VideoDebateRoom = ({
     }
   }, [currentUser, debateId]);
 
-  // Auto-rejoin when user becomes a debater
-  const prevIsDebaterRef = useRef(isDebater);
+  // Auto-rejoin when user becomes a participant with media (debater or moderator)
+  const prevNeedsMediaRef = useRef(needsMedia);
   useEffect(() => {
-    const wasDebater = prevIsDebaterRef.current;
-    const isNowDebater = isDebater;
+    const wasNeedingMedia = prevNeedsMediaRef.current;
+    const isNowNeedingMedia = needsMedia;
     
-    // If user just became a debater, rejoin to get proper tracks
-    if (!wasDebater && isNowDebater && joined) {
-      console.log('🔄 User became debater - rejoining with video/audio...');
+    // If user just became a participant with media, rejoin to get proper tracks
+    if (!wasNeedingMedia && isNowNeedingMedia && joined) {
+      console.log('🔄 User became participant with media - rejoining with video/audio...');
       const rejoin = async () => {
         await leaveChannel();
         setTimeout(() => {
@@ -567,8 +571,8 @@ const VideoDebateRoom = ({
       rejoin();
     }
     
-    prevIsDebaterRef.current = isDebater;
-  }, [isDebater, joined]);
+    prevNeedsMediaRef.current = needsMedia;
+  }, [needsMedia, joined]);
 
   useEffect(() => {
     return () => {
@@ -1207,7 +1211,7 @@ const VideoDebateRoom = ({
                   </div>
                 )}
               </div>
-              {/* Only show card for debaters, not moderators */}
+              {/* Only show card for actual debaters in the video grid */}
               {myRole && myRole !== 'moderator' &&
                 (myRole === "debater_a"
                   ? participants.debater_a
@@ -1638,7 +1642,8 @@ const VideoDebateRoom = ({
                       if (debateState.paused) {
                         await resumeDebate(debateId);
                       } else {
-                        await pauseDebate(debateId);
+                        // Pass the current time remaining when pausing
+                        await pauseDebate(debateId, timeRemaining);
                       }
                     }}
                     style={{
