@@ -1087,10 +1087,85 @@ const VideoDebateRoom = ({
       )}
 
       <div style={{ padding: "24px" }}>
+        {/* Show moderator video if they exist and have media */}
+        {isModerator && needsMedia && (
+          <div style={{ marginBottom: "20px" }}>
+            <div
+              style={{
+                position: "relative",
+                borderRadius: "16px",
+                overflow: "hidden",
+                background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                maxWidth: "400px",
+                margin: "0 auto",
+                aspectRatio: "16/9",
+                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
+                border: "2px solid rgba(147, 51, 234, 0.5)",
+              }}
+            >
+              {localVideoTrack ? (
+                <div
+                  ref={localVideoContainerRef}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                  }}
+                >
+                  <img
+                    src={userProfile?.photoURL}
+                    alt={userProfile?.username}
+                    style={{
+                      width: "40%",
+                      height: "40%",
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                      border: "4px solid rgba(147, 51, 234, 0.5)",
+                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                    }}
+                  />
+                </div>
+              )}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "12px",
+                  left: "12px",
+                  background: "rgba(147, 51, 234, 0.9)",
+                  backdropFilter: "blur(10px)",
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  color: "#fff",
+                  fontSize: "13px",
+                  fontWeight: "700",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                👨‍⚖️ Moderator (You)
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: (() => {
+              // Calculate how many videos to show in grid
+              const gridVideoCount = needsMedia && !isModerator ? 1 + remoteUsers.length : remoteUsers.length;
+              if (gridVideoCount === 1) return "1fr";
+              if (gridVideoCount === 2) return "1fr 1fr";
+              return "repeat(auto-fit, minmax(300px, 1fr))";
+            })(),
             gap: "20px",
           }}
         >
@@ -1308,15 +1383,20 @@ const VideoDebateRoom = ({
 
           {remoteUsers.length > 0 ? (
             remoteUsers.map((user) => {
-              // Find which debater this remote user is
+              // Find which participant this remote user is
               const isDebaterA =
                 participants.debater_a?.userId === user.uid.toString();
               const isDebaterB =
                 participants.debater_b?.userId === user.uid.toString();
-              const remoteDebater = isDebaterA
+              const isModerator =
+                participants.moderator?.userId === user.uid.toString();
+              
+              const remoteParticipant = isDebaterA
                 ? participants.debater_a
                 : isDebaterB
                 ? participants.debater_b
+                : isModerator
+                ? participants.moderator
                 : null;
 
               return (
@@ -1332,6 +1412,9 @@ const VideoDebateRoom = ({
                       boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
                       transition: "all 0.3s ease",
                       ...getBorderStyle(remoteSpeaking[user.uid], !isMyTurn),
+                      border: isModerator 
+                        ? "2px solid rgba(147, 51, 234, 0.5)" 
+                        : getBorderStyle(remoteSpeaking[user.uid], !isMyTurn).border,
                     }}
                   >
                     {user.videoTrack ? (
@@ -1352,14 +1435,16 @@ const VideoDebateRoom = ({
                         }}
                       >
                         <img
-                          src={remoteDebater?.profileData?.photoURL}
-                          alt={remoteDebater?.profileData?.username}
+                          src={remoteParticipant?.profileData?.photoURL}
+                          alt={remoteParticipant?.profileData?.username}
                           style={{
                             width: "40%",
                             height: "40%",
                             borderRadius: "50%",
                             objectFit: "cover",
-                            border: isDebaterA
+                            border: isModerator
+                              ? "4px solid rgba(147, 51, 234, 0.5)"
+                              : isDebaterA
                               ? "4px solid rgba(59, 130, 246, 0.5)"
                               : "4px solid rgba(239, 68, 68, 0.5)",
                             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
@@ -1386,21 +1471,21 @@ const VideoDebateRoom = ({
                       }}
                     >
                       {remoteSpeaking[user.uid] && (
-                        <span
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            background: "#10b981",
-                            borderRadius: "50%",
-                            animation: "pulse 1s infinite",
-                          }}
-                        ></span>
+                      <span
+                      style={{
+                      width: "8px",
+                      height: "8px",
+                      background: "#10b981",
+                      borderRadius: "50%",
+                      animation: "pulse 1s infinite",
+                      }}
+                      ></span>
                       )}
-                      Opponent
+                      {isModerator ? "👨‍⚖️ Moderator" : "Opponent"}
                     </div>
                   </div>
-                  {/* Remote Debater Info Card */}
-                  {remoteDebater && (
+                  {/* Remote Participant Info Card */}
+                  {remoteParticipant && (isDebaterA || isDebaterB) && (
                     <div
                       style={{
                         marginTop: "12px",
@@ -1418,8 +1503,8 @@ const VideoDebateRoom = ({
                       }}
                     >
                       <img
-                        src={remoteDebater.profileData?.photoURL}
-                        alt={remoteDebater.profileData?.username}
+                        src={remoteParticipant.profileData?.photoURL}
+                        alt={remoteParticipant.profileData?.username}
                         style={{
                           width: "64px",
                           height: "64px",
@@ -1452,7 +1537,7 @@ const VideoDebateRoom = ({
                             marginBottom: "4px",
                           }}
                         >
-                          {remoteDebater.profileData?.username}
+                          {remoteParticipant.profileData?.username}
                         </div>
                         <div
                           style={{
@@ -1464,7 +1549,66 @@ const VideoDebateRoom = ({
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {remoteDebater.sideDescription}
+                          {remoteParticipant.sideDescription}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Moderator Info Card */}
+                  {remoteParticipant && isModerator && (
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "16px",
+                        padding: "16px",
+                        background: "linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(126, 34, 206, 0.05) 100%)",
+                        border: "1px solid rgba(147, 51, 234, 0.3)",
+                        borderRadius: "16px",
+                      }}
+                    >
+                      <img
+                        src={remoteParticipant.profileData?.photoURL}
+                        alt={remoteParticipant.profileData?.username}
+                        style={{
+                          width: "64px",
+                          height: "64px",
+                          borderRadius: "16px",
+                          border: "3px solid rgba(147, 51, 234, 0.5)",
+                          boxShadow: "0 4px 15px rgba(147, 51, 234, 0.3)",
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "#a78bfa",
+                            fontWeight: "800",
+                            letterSpacing: "0.1em",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          MODERATOR
+                        </div>
+                        <div
+                          style={{
+                            fontWeight: "700",
+                            color: "#fff",
+                            fontSize: "18px",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          {remoteParticipant.profileData?.username}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            color: "#94a3b8",
+                            fontWeight: "500",
+                          }}
+                        >
+                          Overseeing debate
                         </div>
                       </div>
                     </div>
