@@ -232,10 +232,10 @@ const VideoDebateRoom = ({
         
         // If audio track, try to play it (browsers may block without user interaction)
         if (mediaType === 'audio' && user.audioTrack) {
-          console.log('🔊 Attempting to play remote audio');
+          console.log('🔊 Attempting to play remote audio from uid:', user.uid);
           try {
             await user.audioTrack.play();
-            console.log('✅ Audio playing successfully');
+            console.log('✅ Audio playing successfully from uid:', user.uid);
           } catch (audioError) {
             console.log('⚠️ Audio autoplay blocked:', audioError.message);
             setAudioBlocked(true);
@@ -245,7 +245,9 @@ const VideoDebateRoom = ({
         // Always update the user in state to ensure React re-renders with new tracks
         setRemoteUsers((prev) => {
           const filtered = prev.filter((u) => u.uid !== user.uid);
-          return [...filtered, user];
+          const updated = [...filtered, user];
+          console.log('👥 Updated remote users, total count:', updated.length, 'UIDs:', updated.map(u => u.uid));
+          return updated;
         });
         
         console.log('✅ Subscribed to', mediaType, 'from user', user.uid);
@@ -676,6 +678,21 @@ const VideoDebateRoom = ({
             <span style={{ fontSize: "22px" }}>📹</span>
             Live Video
           </h3>
+
+          {/* Participants Connected Indicator */}
+          <div
+            style={{
+              padding: "6px 14px",
+              background: "rgba(16, 185, 129, 0.15)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+              borderRadius: "10px",
+              fontSize: "13px",
+              color: "#10b981",
+              fontWeight: "700",
+            }}
+          >
+            👥 {(needsMedia ? 1 : 0) + remoteUsers.length}/{participants.debater_a && participants.debater_b && participants.moderator ? 3 : participants.debater_a && participants.debater_b ? 2 : 0} Connected
+          </div>
 
           {debateState &&
             debateState.debateStarted &&
@@ -1162,6 +1179,14 @@ const VideoDebateRoom = ({
             gridTemplateColumns: (() => {
               // Calculate how many videos to show in grid
               const gridVideoCount = needsMedia && !isModerator ? 1 + remoteUsers.length : remoteUsers.length;
+              console.log('📊 Grid calculation:', {
+                needsMedia,
+                isModerator,
+                remoteUsersCount: remoteUsers.length,
+                remoteUserUIDs: remoteUsers.map(u => u.uid),
+                gridVideoCount,
+                gridLayout: gridVideoCount === 1 ? "1fr" : gridVideoCount === 2 ? "1fr 1fr" : "repeat(auto-fit, minmax(300px, 1fr))"
+              });
               if (gridVideoCount === 1) return "1fr";
               if (gridVideoCount === 2) return "1fr 1fr";
               return "repeat(auto-fit, minmax(300px, 1fr))";
@@ -1699,8 +1724,8 @@ const VideoDebateRoom = ({
         </div>
       </div>
 
-      {/* Moderator Section */}
-      {participants.moderator && (
+      {/* Moderator Control Panel - Only visible to the moderator */}
+      {isModerator && participants.moderator && (
         <div style={{ padding: "0 24px 24px" }}>
           <div
             style={{
