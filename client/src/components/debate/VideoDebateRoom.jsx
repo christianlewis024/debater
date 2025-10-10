@@ -61,6 +61,9 @@ const VideoDebateRoom = ({
 
   const isModerator = participants.moderator?.userId === currentUser?.uid;
 
+  // Moderators also get video/audio like debaters
+  const needsMedia = isDebater || isModerator;
+
   const myRole =
     participants.debater_a?.userId === currentUser?.uid
       ? "debater_a"
@@ -126,27 +129,32 @@ const VideoDebateRoom = ({
     ) {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
       return;
     }
 
-    timerIntervalRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        const newTime = prev - 1;
-        if (newTime <= 0) {
-          switchTurn(debateId, debateState);
-          return debateState.turnTime;
-        }
-        return newTime;
-      });
-    }, 1000);
+    // Only start timer if not already running
+    if (!timerIntervalRef.current) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimeRemaining((prev) => {
+          const newTime = prev - 1;
+          if (newTime <= 0) {
+            switchTurn(debateId, debateState);
+            return debateState.turnTime;
+          }
+          return newTime;
+        });
+      }, 1000);
+    }
 
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
     };
-  }, [debateState, debateId]);
+  }, [debateState?.debateStarted, debateState?.debateEnded, debateState?.paused, debateId]);
 
   // Auto-mute/unmute based on turns
   useEffect(() => {
@@ -154,10 +162,10 @@ const VideoDebateRoom = ({
       return;
     }
 
-    // Only control audio for debaters, not moderators
+    // Only control audio for debaters, not moderators or viewers
     if (myRole === 'debater_a' || myRole === 'debater_b') {
       if (isMyTurn) {
-        // It's my turn - unmute if I was muted
+        // It's my turn - unmute if I was muted by the system
         if (micMuted && localAudioTrack) {
           localAudioTrack.setEnabled(true);
           setMicMuted(false);
@@ -172,7 +180,7 @@ const VideoDebateRoom = ({
         }
       }
     }
-    // Moderator is never auto-muted
+    // Moderators and viewers are never auto-muted - they can speak freely
   }, [debateState?.currentTurn, isMyTurn, myRole, localAudioTrack]);
 
   const handleStartDebate = async () => {
@@ -205,8 +213,8 @@ const VideoDebateRoom = ({
   };
 
   useEffect(() => {
-    if (isDebater) getDevices();
-  }, [isDebater]);
+    if (needsMedia) getDevices();
+  }, [needsMedia]);
 
   useEffect(() => {
     if (!client) return;
@@ -316,7 +324,7 @@ const VideoDebateRoom = ({
       let audioTrack = null;
       let videoTrack = null;
 
-      if (isDebater) {
+      if (needsMedia) {
       const tracks = await createTracks();
       audioTrack = tracks.audioTrack;
       videoTrack = tracks.videoTrack;
@@ -344,7 +352,7 @@ const VideoDebateRoom = ({
       await client.join(appId, debateId, null, currentUser.uid);
 
       // Publish whatever tracks are available
-      if (isDebater) {
+      if (needsMedia) {
         const tracksToPublish = [];
         if (audioTrack) {
           tracksToPublish.push(audioTrack);
@@ -837,7 +845,7 @@ const VideoDebateRoom = ({
         </div>
 
         <div style={{ display: "flex", gap: "10px" }}>
-          {isDebater && localAudioTrack && (
+          {needsMedia && localAudioTrack && (
             <>
               <button
                 onClick={toggleMic}
@@ -1078,7 +1086,7 @@ const VideoDebateRoom = ({
             gap: "20px",
           }}
         >
-          {isDebater && (
+          {needsMedia && (
             <div>
               <div
                 style={{
@@ -1456,7 +1464,7 @@ const VideoDebateRoom = ({
                 </div>
               );
             })
-          ) : isDebater && localVideoTrack ? (
+          ) : needsMedia && localVideoTrack ? (
             <div
               style={{
                 position: "relative",
@@ -1494,7 +1502,7 @@ const VideoDebateRoom = ({
             </div>
           ) : null}
 
-          {!isDebater && remoteUsers.length === 0 && (
+          {!needsMedia && remoteUsers.length === 0 && (
             <div
               style={{
                 gridColumn: "1 / -1",
