@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm start)",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "mcp__puppeteer__puppeteer_fill",
+      "mcp__puppeteer__puppeteer_click",
+      "mcp__puppeteer__puppeteer_select",
+      "mcp__firebase__firebase_get_environment",
+      "mcp__firebase__firebase_get_project",
+      "mcp__firebase__firebase_list_apps",
+      "mcp__firebase__firestore_list_collections",
+      "mcp__firebase__firestore_query_collection",
+      "mcp__firebase__auth_get_users",
+      "mcp__firebase__firebase_get_security_rules",
+      "mcp__firebase__firestore_get_documents",
+      "Bash(npm run build:*)",
+      "Bash(npm run client:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(npm uninstall:*)",
+      "Bash(npx playwright install chromium)",
+      "Bash(npm test:*)",
+      "Bash(rm:*)",
+      "Bash(npm run test:e2e:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

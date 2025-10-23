@@ -6,6 +6,7 @@ import { createDebate } from '../services/debateService';
 const CreateDebatePage = () => {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('general');
+  const [structure, setStructure] = useState('moderated'); // New: debate structure type
   const [turnTime, setTurnTime] = useState(60);
   const [maxTurns, setMaxTurns] = useState(10);
   const [loading, setLoading] = useState(false);
@@ -42,6 +43,7 @@ const CreateDebatePage = () => {
       const debateData = {
         title,
         category,
+        structure, // Add structure type to debate data
         settings: {
           turnTime: parseInt(turnTime),
           maxTurns: parseInt(maxTurns)
@@ -233,6 +235,89 @@ const CreateDebatePage = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Debate Structure */}
+            <div style={{ marginBottom: '28px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#e2e8f0',
+                marginBottom: '10px',
+                letterSpacing: '0.02em'
+              }}>
+                Debate Structure *
+              </label>
+
+              {/* Structure Options */}
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {/* Moderated Option */}
+                <div
+                  onClick={() => setStructure('moderated')}
+                  style={{
+                    padding: '16px 20px',
+                    background: structure === 'moderated' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(31, 41, 55, 0.6)',
+                    border: `2px solid ${structure === 'moderated' ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px', marginRight: '10px' }}>👤</span>
+                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#fff' }}>Moderated</span>
+                    {structure === 'moderated' && <span style={{ marginLeft: 'auto', color: '#3b82f6', fontSize: '18px' }}>✓</span>}
+                  </div>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.5', marginLeft: '30px' }}>
+                    A third user acts as moderator with full control (pause, resume, add time, skip turns)
+                  </p>
+                </div>
+
+                {/* Auto-Moderated Option */}
+                <div
+                  onClick={() => setStructure('auto-moderated')}
+                  style={{
+                    padding: '16px 20px',
+                    background: structure === 'auto-moderated' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(31, 41, 55, 0.6)',
+                    border: `2px solid ${structure === 'auto-moderated' ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px', marginRight: '10px' }}>⚙️</span>
+                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#fff' }}>Auto-Moderated</span>
+                    {structure === 'auto-moderated' && <span style={{ marginLeft: 'auto', color: '#3b82f6', fontSize: '18px' }}>✓</span>}
+                  </div>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.5', marginLeft: '30px' }}>
+                    Automated turn-based system with set time intervals and auto-muting
+                  </p>
+                </div>
+
+                {/* Self-Moderated Option */}
+                <div
+                  onClick={() => setStructure('self-moderated')}
+                  style={{
+                    padding: '16px 20px',
+                    background: structure === 'self-moderated' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(31, 41, 55, 0.6)',
+                    border: `2px solid ${structure === 'self-moderated' ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px', marginRight: '10px' }}>🎙️</span>
+                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#fff' }}>Self-Moderated</span>
+                    {structure === 'self-moderated' && <span style={{ marginLeft: 'auto', color: '#3b82f6', fontSize: '18px' }}>✓</span>}
+                  </div>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.5', marginLeft: '30px' }}>
+                    Host debates multiple users one-on-one (like a campus debate setup)
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Settings Grid */}

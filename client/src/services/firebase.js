@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getDatabase } from 'firebase/database';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -21,5 +21,28 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const rtdb = getDatabase(app);
+
+// Connect to Firebase Emulators if in development mode
+if (process.env.REACT_APP_USE_EMULATORS === 'true') {
+  console.log('🔧 Connecting to Firebase Emulators...');
+
+  // Connect to Auth Emulator
+  const authPort = process.env.REACT_APP_AUTH_EMULATOR_PORT || 9099;
+  connectAuthEmulator(auth, `http://localhost:${authPort}`, { disableWarnings: true });
+  console.log(`✅ Auth Emulator: http://localhost:${authPort}`);
+
+  // Connect to Firestore Emulator
+  const firestorePort = process.env.REACT_APP_FIRESTORE_EMULATOR_PORT || 8080;
+  connectFirestoreEmulator(db, 'localhost', firestorePort);
+  console.log(`✅ Firestore Emulator: http://localhost:${firestorePort}`);
+
+  // Connect to Realtime Database Emulator
+  const databasePort = process.env.REACT_APP_DATABASE_EMULATOR_PORT || 9000;
+  connectDatabaseEmulator(rtdb, 'localhost', databasePort);
+  console.log(`✅ Database Emulator: http://localhost:${databasePort}`);
+
+  console.log('🎉 All Firebase Emulators connected!');
+  console.log('📊 Emulator UI: http://localhost:4000');
+}
 
 export default app;

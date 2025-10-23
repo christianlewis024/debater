@@ -39,7 +39,9 @@ const BrowseDebatesPage = () => {
     try {
       const unsubscribe = subscribeToDebates((debatesData) => {
         console.log('Received debates:', debatesData);
-        setDebates(debatesData);
+        // Filter out debates older than 24 hours
+        const recentDebates = debatesData.filter(debate => !isDebateOld(debate.createdAt));
+        setDebates(recentDebates);
         setLoading(false);
       }, filters);
 
@@ -54,17 +56,48 @@ const BrowseDebatesPage = () => {
     }
   }, [categoryFilter, statusFilter]);
 
-  const formatTimeAgo = (timestamp) => {
+  // Format timestamp with full date/time for older debates
+  const formatTimestamp = (timestamp) => {
     if (!timestamp) return 'Just now';
     try {
-      const seconds = Math.floor((new Date() - timestamp.toDate()) / 1000);
-      
-      if (seconds < 60) return `${seconds}s ago`;
-      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-      return `${Math.floor(seconds / 86400)}d ago`;
+      const date = timestamp.toDate();
+      const now = new Date();
+      const seconds = Math.floor((now - date) / 1000);
+
+      // Less than 1 hour: show relative time
+      if (seconds < 3600) {
+        if (seconds < 60) return `${seconds}s ago`;
+        return `${Math.floor(seconds / 60)}m ago`;
+      }
+
+      // Less than 24 hours: show hours ago
+      if (seconds < 86400) {
+        return `${Math.floor(seconds / 3600)}h ago`;
+      }
+
+      // Older than 24 hours: show full date and time
+      const options = {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      };
+      return date.toLocaleString('en-US', options);
     } catch (e) {
       return 'Just now';
+    }
+  };
+
+  // Check if debate is older than 24 hours
+  const isDebateOld = (timestamp) => {
+    if (!timestamp) return false;
+    try {
+      const seconds = Math.floor((new Date() - timestamp.toDate()) / 1000);
+      return seconds > 86400; // 24 hours in seconds
+    } catch (e) {
+      return false;
     }
   };
 
@@ -306,7 +339,7 @@ const BrowseDebatesPage = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#94a3b8', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: '600' }}>by {debate.hostUsername}</span>
                       <span style={{ opacity: 0.5 }}>•</span>
-                      <span>{formatTimeAgo(debate.createdAt)}</span>
+                      <span>{formatTimestamp(debate.createdAt)}</span>
                       <span style={{ opacity: 0.5 }}>•</span>
                       <span style={{
                         padding: '4px 12px',
@@ -318,6 +351,23 @@ const BrowseDebatesPage = () => {
                       }}>
                         {debate.category?.charAt(0).toUpperCase() + debate.category?.slice(1)}
                       </span>
+                      {debate.structure && (
+                        <>
+                          <span style={{ opacity: 0.5 }}>•</span>
+                          <span style={{
+                            padding: '4px 12px',
+                            background: 'rgba(147, 51, 234, 0.15)',
+                            borderRadius: '8px',
+                            color: '#a78bfa',
+                            fontWeight: '600',
+                            fontSize: '13px'
+                          }}>
+                            {debate.structure === 'moderated' && '👤 Moderated'}
+                            {debate.structure === 'auto-moderated' && '⚙️ Auto'}
+                            {debate.structure === 'self-moderated' && '🎙️ Self'}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                   {getStatusBadge(debate.status)}

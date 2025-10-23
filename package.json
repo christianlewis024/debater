@@ -1,5 +1,24 @@
 {
+  "name": "debater",
+  "version": "1.0.0",
+  "description": "Real-time video debate platform",
+  "scripts": {
+    "dev": "concurrently \"npm run client\" \"npm run emulators\" --names \"CLIENT,FIREBASE\" --prefix-colors \"cyan,yellow\"",
+    "client": "cd client && npm start",
+    "emulators": "firebase emulators:start",
+    "build": "cd client && npm run build",
+    "test": "cd client && npm test",
+    "deploy": "npm run build && firebase deploy",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy:rules": "firebase deploy --only firestore:rules,database"
+  },
   "dependencies": {
     "firebase": "^12.3.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "firebase-tools": "^13.31.3",
+    "puppeteer": "^24.26.0"
   }
 }

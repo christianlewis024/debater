@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
-import {
-  subscribeToDebateState,
-  switchTurn,
-  startDebate,
-  initializeDebateState,
-} from "../../services/debateStateService";
+import { startDebate, initializeDebateState } from "../../services/debateStateService";
+import { useDebateState } from "../../hooks/useDebateState";
+import { useDebateTimer } from "../../hooks/useDebateTimer";
+import { useAutoMute } from "../../hooks/useAutoMute";
+import DebateTimer from "./DebateTimer";
+import DeviceSettings from "./DeviceSettings";
+import WaitlistPanel from "./WaitlistPanel";
 
 const VideoDebateRoom = ({
   debateId,
@@ -19,6 +20,7 @@ const VideoDebateRoom = ({
   const [localAudioTrack, setLocalAudioTrack] = useState(null);
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [micMuted, setMicMuted] = useState(false);
+  const [manuallyMuted, setManuallyMuted] = useState(false); // Track manual muting
   const [cameraMuted, setCameraMuted] = useState(false);
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
@@ -26,10 +28,6 @@ const VideoDebateRoom = ({
   // Speaking detection
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [remoteSpeaking, setRemoteSpeaking] = useState({});
-
-  // Turn-based state
-  const [debateState, setDebateState] = useState(null);
-  const [timeRemaining, setTimeRemaining] = useState(60);
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -45,7 +43,10 @@ const VideoDebateRoom = ({
   const clientRef = useRef(null);
   const localVideoContainerRef = useRef(null);
   const hasJoinedRef = useRef(false);
-  const timerIntervalRef = useRef(null);
+
+  // Custom hooks for debate state management
+  const debateState = useDebateState(debateId, participants, debate);
+  const timeRemaining = useDebateTimer(debateId, debateState);
 
   const appId = process.env.REACT_APP_AGORA_APP_ID;
 
@@ -60,6 +61,13 @@ const VideoDebateRoom = ({
     participants.debater_b?.userId === currentUser?.uid;
 
   const isModerator = participants.moderator?.userId === currentUser?.uid;
+  const isHost = debate?.hostId === currentUser?.uid;
+
+  // Determine if current user should have moderator controls based on structure
+  const hasModeratorControls =
+    (debate?.structure === 'moderated' && isModerator) ||
+    (debate?.structure === 'self-moderated' && isHost) ||
+    (!debate?.structure && isModerator); // Fallback for debates without structure field
 
   // Moderators also get video/audio like debaters
   const needsMedia = isDebater || isModerator;
@@ -75,117 +83,8 @@ const VideoDebateRoom = ({
 
   const isMyTurn = debateState?.currentTurn === myRole;
 
-  // Subscribe to debate state
-  useEffect(() => {
-    if (!debateId) return;
-
-    const unsubscribe = subscribeToDebateState(debateId, (state) => {
-      setDebateState(state);
-      // Only update timeRemaining if it's a new turn or debate just started
-      if (state && state.timeRemaining && 
-          (!debateState || 
-           state.turnNumber !== debateState.turnNumber || 
-           (!debateState.debateStarted && state.debateStarted))) {
-        setTimeRemaining(state.timeRemaining);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [debateId]);
-
-  // Initialize debate state when both debaters join
-  useEffect(() => {
-    const initDebateState = async () => {
-      if (
-        participants.debater_a &&
-        participants.debater_b &&
-        debate?.settings
-      ) {
-        console.log("Initializing debate state...", {
-          debateId,
-          settings: debate.settings,
-        });
-        try {
-          await initializeDebateState(debateId, debate.settings);
-          console.log("Debate state initialized!");
-        } catch (error) {
-          console.error("Error initializing debate state:", error);
-        }
-      } else {
-        console.log("Cannot initialize - missing:", {
-          hasDebaterA: !!participants.debater_a,
-          hasDebaterB: !!participants.debater_b,
-          hasDebate: !!debate,
-          hasSettings: !!debate?.settings,
-        });
-      }
-    };
-    initDebateState();
-  }, [participants.debater_a, participants.debater_b, debate, debateId]);
-
-  // Timer countdown
-  useEffect(() => {
-    if (
-      !debateState ||
-      !debateState.debateStarted ||
-      debateState.debateEnded ||
-      debateState.paused
-    ) {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Only start timer if not already running
-    if (!timerIntervalRef.current) {
-      timerIntervalRef.current = setInterval(() => {
-        setTimeRemaining((prev) => {
-          const newTime = prev - 1;
-          if (newTime <= 0) {
-            switchTurn(debateId, debateState);
-            return debateState.turnTime;
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-    };
-  }, [debateState?.debateStarted, debateState?.debateEnded, debateState?.paused, debateId]);
-
   // Auto-mute/unmute based on turns
-  useEffect(() => {
-    if (!debateState || !debateState.debateStarted || debateState.debateEnded) {
-      return;
-    }
-
-    // Only control audio for debaters, not moderators or viewers
-    if (myRole === 'debater_a' || myRole === 'debater_b') {
-      if (isMyTurn) {
-        // It's my turn - unmute if I was muted by the system
-        if (micMuted && localAudioTrack) {
-          localAudioTrack.setEnabled(true);
-          setMicMuted(false);
-          console.log('🎤 Auto-unmuted: Your turn to speak');
-        }
-      } else {
-        // Not my turn - mute
-        if (!micMuted && localAudioTrack) {
-          localAudioTrack.setEnabled(false);
-          setMicMuted(true);
-          console.log('🔇 Auto-muted: Waiting for your turn');
-        }
-      }
-    }
-    // Moderators and viewers are never auto-muted - they can speak freely
-  }, [debateState?.currentTurn, isMyTurn, myRole, localAudioTrack]);
+  useAutoMute(debateState, myRole, isMyTurn, localAudioTrack, micMuted, setMicMuted, manuallyMuted, setManuallyMuted);
 
   const handleStartDebate = async () => {
     if (debateState && !debateState.debateStarted) {
@@ -227,32 +126,24 @@ const VideoDebateRoom = ({
 
     const handleUserPublished = async (user, mediaType) => {
       try {
-        console.log('📡 Remote user published:', { uid: user.uid, mediaType });
         await client.subscribe(user, mediaType);
-        
+
         // If audio track, try to play it (browsers may block without user interaction)
         if (mediaType === 'audio' && user.audioTrack) {
-          console.log('🔊 Attempting to play remote audio from uid:', user.uid);
           try {
             await user.audioTrack.play();
-            console.log('✅ Audio playing successfully from uid:', user.uid);
           } catch (audioError) {
-            console.log('⚠️ Audio autoplay blocked:', audioError.message);
             setAudioBlocked(true);
           }
         }
-        
+
         // Always update the user in state to ensure React re-renders with new tracks
         setRemoteUsers((prev) => {
           const filtered = prev.filter((u) => u.uid !== user.uid);
-          const updated = [...filtered, user];
-          console.log('👥 Updated remote users, total count:', updated.length, 'UIDs:', updated.map(u => u.uid));
-          return updated;
+          return [...filtered, user];
         });
-        
-        console.log('✅ Subscribed to', mediaType, 'from user', user.uid);
       } catch (error) {
-        console.error("❌ Error subscribing:", error);
+        console.error("Error subscribing:", error);
       }
     };
 
@@ -302,7 +193,7 @@ const VideoDebateRoom = ({
         : {};
       audioTrack = await AgoraRTC.createMicrophoneAudioTrack(audioConfig);
     } catch (error) {
-      console.log('Could not create audio track:', error);
+      // Silent fail - will show error in UI
     }
 
     // Try to create video track
@@ -312,7 +203,7 @@ const VideoDebateRoom = ({
         : { encoderConfig: "720p_2" };
       videoTrack = await AgoraRTC.createCameraVideoTrack(videoConfig);
     } catch (error) {
-      console.log('Could not create video track:', error);
+      // Silent fail - will show error in UI
     }
 
     return { audioTrack, videoTrack };
@@ -360,28 +251,11 @@ const VideoDebateRoom = ({
       // Publish whatever tracks are available
       if (needsMedia) {
         const tracksToPublish = [];
-        if (audioTrack && audioTrack.enabled) {
-          tracksToPublish.push(audioTrack);
-          console.log('🎤 Publishing audio track');
-        } else if (audioTrack) {
-          console.log('⚠️ Audio track disabled, not publishing');
-        } else {
-          console.log('⚠️ No audio track to publish');
-        }
-        if (videoTrack && videoTrack.enabled) {
-          tracksToPublish.push(videoTrack);
-          console.log('📹 Publishing video track');
-        } else if (videoTrack) {
-          console.log('⚠️ Video track disabled, not publishing');
-        } else {
-          console.log('⚠️ No video track to publish');
-        }
-        
+        if (audioTrack && audioTrack.enabled) tracksToPublish.push(audioTrack);
+        if (videoTrack && videoTrack.enabled) tracksToPublish.push(videoTrack);
+
         if (tracksToPublish.length > 0) {
           await client.publish(tracksToPublish);
-          console.log('✅ Successfully published', tracksToPublish.length, 'track(s)');
-        } else {
-          console.log('⚠️ No tracks to publish');
         }
       }
 
@@ -396,8 +270,6 @@ const VideoDebateRoom = ({
 
   const leaveChannel = async () => {
     try {
-      console.log('👋 Leaving Agora channel and cleaning up tracks...');
-      
       // Stop and close local tracks
       if (localAudioTrack) {
         localAudioTrack.stop();
@@ -409,13 +281,13 @@ const VideoDebateRoom = ({
         localVideoTrack.close();
         setLocalVideoTrack(null);
       }
-      
+
       // Stop all remote tracks
       remoteUsers.forEach(user => {
         if (user.audioTrack) user.audioTrack.stop();
         if (user.videoTrack) user.videoTrack.stop();
       });
-      
+
       // Leave Agora channel
       if (client && joined) {
         await client.leave();
@@ -424,10 +296,8 @@ const VideoDebateRoom = ({
       setJoined(false);
       setRemoteUsers([]);
       hasJoinedRef.current = false;
-      
-      console.log('✅ Successfully left channel and cleaned up');
     } catch (err) {
-      console.error("❌ Error leaving:", err);
+      console.error("Error leaving:", err);
     }
   };
 
@@ -458,10 +328,11 @@ const VideoDebateRoom = ({
         // Don't allow unmuting if it's not your turn
         return;
       }
-      
+
       const newState = !micMuted;
       await localAudioTrack.setEnabled(!newState);
       setMicMuted(newState);
+      setManuallyMuted(newState); // Track that this was a manual action
     }
   };
 
@@ -562,7 +433,6 @@ const VideoDebateRoom = ({
     
     // If user just became a participant with media, rejoin to get proper tracks
     if (!wasNeedingMedia && isNowNeedingMedia && joined) {
-      console.log('🔄 User became participant with media - rejoining with video/audio...');
       const rejoin = async () => {
         await leaveChannel();
         setTimeout(() => {
@@ -579,7 +449,6 @@ const VideoDebateRoom = ({
   useEffect(() => {
     return () => {
       if (joined || hasJoinedRef.current) leaveChannel();
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
 
@@ -697,88 +566,16 @@ const VideoDebateRoom = ({
           {debateState &&
             debateState.debateStarted &&
             !debateState.debateEnded && (
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "16px" }}
-              >
-                <div
-                  style={{
-                    padding: "8px 16px",
-                    background: isMyTurn
-                      ? "rgba(16, 185, 129, 0.2)"
-                      : "rgba(100, 116, 139, 0.2)",
-                    borderRadius: "10px",
-                    border: `1px solid ${
-                      isMyTurn
-                        ? "rgba(16, 185, 129, 0.4)"
-                        : "rgba(100, 116, 139, 0.3)"
-                    }`,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <span style={{ fontSize: "18px" }}>
-                    {isMyTurn ? "🎤" : "👂"}
-                  </span>
-                  <span
-                    style={{
-                      color: isMyTurn ? "#10b981" : "#94a3b8",
-                      fontWeight: "700",
-                      fontSize: "14px",
-                    }}
-                  >
-                    {isMyTurn ? "Your Turn" : "Their Turn"}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    padding: "8px 20px",
-                    background:
-                      timeRemaining <= 10
-                        ? "rgba(239, 68, 68, 0.2)"
-                        : "rgba(59, 130, 246, 0.2)",
-                    borderRadius: "10px",
-                    border: `1px solid ${
-                      timeRemaining <= 10
-                        ? "rgba(239, 68, 68, 0.4)"
-                        : "rgba(59, 130, 246, 0.4)"
-                    }`,
-                    fontWeight: "800",
-                    fontSize: "18px",
-                    color: timeRemaining <= 10 ? "#ef4444" : "#60a5fa",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  {formatTime(timeRemaining)}
-                </div>
-
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    background: "rgba(147, 51, 234, 0.2)",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(147, 51, 234, 0.3)",
-                    fontSize: "12px",
-                    color: "#a78bfa",
-                    fontWeight: "600",
-                  }}
-                >
-                  Turn {debateState.turnNumber}/{debateState.maxTurns}
-                </div>
-              </div>
+              <DebateTimer
+                timeRemaining={timeRemaining}
+                isMyTurn={isMyTurn}
+                turnNumber={debateState.turnNumber}
+                maxTurns={debateState.maxTurns}
+              />
             )}
 
-          {/* Debug and Control Buttons */}
+          {/* Control Buttons */}
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* Console log for debugging - not visible to users */}
-            {console.log("Debate State:", {
-              hasDebateState: !!debateState,
-              debateStarted: debateState?.debateStarted,
-              hasDebaterA: !!participants.debater_a,
-              hasDebaterB: !!participants.debater_b,
-            })}
-
             {/* Manual Init Button - if state doesn't exist but both debaters are here */}
             {!debateState &&
               participants.debater_a &&
@@ -786,13 +583,11 @@ const VideoDebateRoom = ({
               debate && (
                 <button
                   onClick={async () => {
-                    console.log("Manual init clicked");
                     try {
                       await initializeDebateState(
                         debateId,
                         debate.settings || { turnTime: 60, maxTurns: 10 }
                       );
-                      console.log("State created!");
                     } catch (error) {
                       console.error("Failed to create state:", error);
                     }
@@ -962,86 +757,16 @@ const VideoDebateRoom = ({
       </div>
 
       {showDeviceSettings && isDebater && (
-        <div
-          style={{
-            padding: "24px",
-            background: "rgba(31, 41, 55, 0.5)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <div style={{ display: "grid", gap: "16px" }}>
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  color: "#e2e8f0",
-                  marginBottom: "8px",
-                }}
-              >
-                Camera
-              </label>
-              <select
-                value={selectedCamera}
-                onChange={(e) => switchCamera(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  background: "rgba(17, 24, 39, 0.8)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "10px",
-                  color: "#fff",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-                disabled={!localVideoTrack}
-              >
-                {cameras.map((camera) => (
-                  <option key={camera.deviceId} value={camera.deviceId}>
-                    {camera.label || `Camera ${camera.deviceId.slice(0, 8)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  color: "#e2e8f0",
-                  marginBottom: "8px",
-                }}
-              >
-                Microphone
-              </label>
-              <select
-                value={selectedMicrophone}
-                onChange={(e) => switchMicrophone(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  background: "rgba(17, 24, 39, 0.8)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "10px",
-                  color: "#fff",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-                disabled={!localAudioTrack}
-              >
-                {microphones.map((mic) => (
-                  <option key={mic.deviceId} value={mic.deviceId}>
-                    {mic.label || `Microphone ${mic.deviceId.slice(0, 8)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
+        <DeviceSettings
+          cameras={cameras}
+          microphones={microphones}
+          selectedCamera={selectedCamera}
+          selectedMicrophone={selectedMicrophone}
+          switchCamera={switchCamera}
+          switchMicrophone={switchMicrophone}
+          localVideoTrack={localVideoTrack}
+          localAudioTrack={localAudioTrack}
+        />
       )}
 
       {error && (
@@ -1173,559 +898,340 @@ const VideoDebateRoom = ({
           </div>
         )}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: (() => {
-              // Calculate how many videos to show in grid
-              const gridVideoCount = needsMedia && !isModerator ? 1 + remoteUsers.length : remoteUsers.length;
-              console.log('📊 Grid calculation:', {
-                needsMedia,
-                isModerator,
-                remoteUsersCount: remoteUsers.length,
-                remoteUserUIDs: remoteUsers.map(u => u.uid),
-                gridVideoCount,
-                gridLayout: gridVideoCount === 1 ? "1fr" : gridVideoCount === 2 ? "1fr 1fr" : "repeat(auto-fit, minmax(300px, 1fr))"
+        {(() => {
+          // Build array of all participants that should appear in grid
+          const gridParticipants = [];
+
+          // Add local user if they're a participant (debater or moderator not shown at top)
+          if (needsMedia && !isModerator) {
+            const localRole = participants.debater_a?.userId === currentUser?.uid ? 'debater_a' :
+                          participants.debater_b?.userId === currentUser?.uid ? 'debater_b' : null;
+            if (localRole) {
+              gridParticipants.push({
+                userId: currentUser.uid,
+                role: localRole,
+                profileData: userProfile,
+                sideDescription: participants[localRole]?.sideDescription,
+                isLocal: true,
               });
-              if (gridVideoCount === 1) return "1fr";
-              if (gridVideoCount === 2) return "1fr 1fr";
-              return "repeat(auto-fit, minmax(300px, 1fr))";
-            })(),
-            gap: "20px",
-          }}
-        >
-          {needsMedia && (
-            <div>
-              <div
-                style={{
-                  position: "relative",
-                  borderRadius: "16px",
-                  overflow: "hidden",
-                  background:
-                    "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                  aspectRatio: "16/9",
-                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
-                  transition: "all 0.3s ease",
-                  ...getBorderStyle(localSpeaking, isMyTurn),
-                }}
-              >
-                {localVideoTrack ? (
-                  <div
-                    ref={localVideoContainerRef}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                ) : (
-                  // Show profile picture if no video
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                    }}
-                  >
-                    <img
-                      src={userProfile?.photoURL}
-                      alt={userProfile?.username}
+            }
+          }
+
+          // Add remote participants from Firestore (source of truth)
+          [
+            { data: participants.debater_a, role: 'debater_a' },
+            { data: participants.debater_b, role: 'debater_b' },
+            { data: participants.moderator, role: 'moderator' },
+          ].forEach(({ data, role }) => {
+            if (data && data.userId !== currentUser?.uid && !(role === 'moderator' && isModerator)) {
+              const agoraUser = remoteUsers.find(u => u.uid.toString() === data.userId);
+              gridParticipants.push({
+                userId: data.userId,
+                role: role,
+                profileData: data.profileData,
+                sideDescription: data.sideDescription,
+                isLocal: false,
+                agoraUser: agoraUser || null,
+              });
+            }
+          });
+
+          const gridVideoCount = gridParticipants.length;
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  gridVideoCount === 1 ? "1fr" :
+                  gridVideoCount === 2 ? "1fr 1fr" :
+                  "repeat(auto-fit, minmax(300px, 1fr))",
+                gap: "20px",
+              }}
+            >
+              {gridParticipants.map((participant) => {
+                const isDebaterA = participant.role === 'debater_a';
+                const isDebaterB = participant.role === 'debater_b';
+                const isModeratorRole = participant.role === 'moderator';
+                const speaking = participant.isLocal ? localSpeaking : remoteSpeaking[participant.agoraUser?.uid];
+                const isTurn = debateState?.currentTurn === participant.role;
+
+                return (
+                  <div key={participant.userId}>
+                    {/* Video Container */}
+                    <div
                       style={{
-                        width: "40%",
-                        height: "40%",
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                        border: "4px solid rgba(59, 130, 246, 0.5)",
-                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
-                      }}
-                    />
-                  </div>
-                )}
-                {localVideoTrack && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "12px",
-                      left: "12px",
-                      background: "rgba(0, 0, 0, 0.7)",
-                      backdropFilter: "blur(10px)",
-                      padding: "8px 16px",
-                      borderRadius: "10px",
-                      color: "#fff",
-                      fontSize: "13px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                    }}
-                  >
-                    {localSpeaking && (
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          background: "#10b981",
-                          borderRadius: "50%",
-                          animation: "pulse 1s infinite",
-                        }}
-                      ></span>
-                    )}
-                    You
-                  </div>
-                )}
-                {!localVideoTrack && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexDirection: "column",
-                      background:
-                        "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                    }}
-                  >
-                    <img
-                      src={userProfile?.photoURL}
-                      alt={userProfile?.username}
-                      style={{
-                        width: "120px",
-                        height: "120px",
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                        border: "4px solid rgba(59, 130, 246, 0.5)",
-                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
-                        marginBottom: "16px",
-                      }}
-                    />
-                    <p
-                      style={{
-                        color: "#64748b",
-                        fontSize: "14px",
-                        fontWeight: "500",
+                        position: "relative",
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                        aspectRatio: "16/9",
+                        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
+                        transition: "all 0.3s ease",
+                        ...getBorderStyle(speaking, isTurn),
+                        ...(isModeratorRole && { border: "2px solid rgba(147, 51, 234, 0.5)" }),
                       }}
                     >
-                      {joining ? "Connecting..." : "No camera detected"}
-                    </p>
-                  </div>
-                )}
-              </div>
-              {/* Only show card for actual debaters in the video grid */}
-              {myRole && myRole !== 'moderator' &&
-                (myRole === "debater_a"
-                  ? participants.debater_a
-                  : participants.debater_b) && (
-                  <div
-                    style={{
-                      marginTop: "12px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "16px",
-                      padding: "16px",
-                      background:
-                        myRole === "debater_a"
-                          ? "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)"
-                          : "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.05) 100%)",
-                      border:
-                        myRole === "debater_a"
-                          ? "1px solid rgba(59, 130, 246, 0.3)"
-                          : "1px solid rgba(239, 68, 68, 0.3)",
-                      borderRadius: "16px",
-                    }}
-                  >
-                    <img
-                      src={
-                        (myRole === "debater_a"
-                          ? participants.debater_a
-                          : participants.debater_b
-                        ).profileData?.photoURL
-                      }
-                      alt={
-                        (myRole === "debater_a"
-                          ? participants.debater_a
-                          : participants.debater_b
-                        ).profileData?.username
-                      }
-                      style={{
-                        width: "64px",
-                        height: "64px",
-                        borderRadius: "16px",
-                        border:
-                          myRole === "debater_a"
-                            ? "3px solid rgba(59, 130, 246, 0.5)"
-                            : "3px solid rgba(239, 68, 68, 0.5)",
-                        boxShadow:
-                          myRole === "debater_a"
-                            ? "0 4px 15px rgba(59, 130, 246, 0.3)"
-                            : "0 4px 15px rgba(239, 68, 68, 0.3)",
-                      }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {participant.isLocal ? (
+                        localVideoTrack ? (
+                          <div ref={localVideoContainerRef} style={{ width: "100%", height: "100%" }} />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <img
+                              src={participant.profileData?.photoURL}
+                              alt={participant.profileData?.username}
+                              style={{
+                                width: "40%",
+                                height: "40%",
+                                borderRadius: "50%",
+                                objectFit: "cover",
+                                border: isDebaterA ? "4px solid rgba(59, 130, 246, 0.5)" : "4px solid rgba(239, 68, 68, 0.5)",
+                                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                              }}
+                            />
+                          </div>
+                        )
+                      ) : (
+                        participant.agoraUser?.videoTrack ? (
+                          <div id={`remote-video-${participant.userId}`} style={{ width: "100%", height: "100%" }} />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <img
+                              src={participant.profileData?.photoURL}
+                              alt={participant.profileData?.username}
+                              style={{
+                                width: "40%",
+                                height: "40%",
+                                borderRadius: "50%",
+                                objectFit: "cover",
+                                border: isModeratorRole
+                                  ? "4px solid rgba(147, 51, 234, 0.5)"
+                                  : isDebaterA
+                                  ? "4px solid rgba(59, 130, 246, 0.5)"
+                                  : "4px solid rgba(239, 68, 68, 0.5)",
+                                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                              }}
+                            />
+                          </div>
+                        )
+                      )}
+
+                      {/* Name Tag Overlay */}
                       <div
                         style={{
-                          fontSize: "11px",
-                          color: myRole === "debater_a" ? "#60a5fa" : "#f87171",
-                          fontWeight: "800",
-                          letterSpacing: "0.1em",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {myRole === "debater_a" ? "PRO" : "CON"}
-                      </div>
-                      <div
-                        style={{
-                          fontWeight: "700",
+                          position: "absolute",
+                          bottom: "12px",
+                          left: "12px",
+                          background: "rgba(0, 0, 0, 0.7)",
+                          backdropFilter: "blur(10px)",
+                          padding: "8px 16px",
+                          borderRadius: "10px",
                           color: "#fff",
-                          fontSize: "18px",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {userProfile?.username}
-                      </div>
-                      <div
-                        style={{
                           fontSize: "13px",
-                          color: "#94a3b8",
-                          fontWeight: "500",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {
-                          (myRole === "debater_a"
-                            ? participants.debater_a
-                            : participants.debater_b
-                          ).sideDescription
-                        }
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
-
-          {remoteUsers.length > 0 ? (
-            remoteUsers.map((user) => {
-              // Find which participant this remote user is
-              const isDebaterA =
-                participants.debater_a?.userId === user.uid.toString();
-              const isDebaterB =
-                participants.debater_b?.userId === user.uid.toString();
-              const isModerator =
-                participants.moderator?.userId === user.uid.toString();
-              
-              const remoteParticipant = isDebaterA
-                ? participants.debater_a
-                : isDebaterB
-                ? participants.debater_b
-                : isModerator
-                ? participants.moderator
-                : null;
-
-              return (
-                <div key={user.uid}>
-                  <div
-                    style={{
-                      position: "relative",
-                      borderRadius: "16px",
-                      overflow: "hidden",
-                      background:
-                        "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                      aspectRatio: "16/9",
-                      boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
-                      transition: "all 0.3s ease",
-                      ...getBorderStyle(remoteSpeaking[user.uid], !isMyTurn),
-                      border: isModerator 
-                        ? "2px solid rgba(147, 51, 234, 0.5)" 
-                        : getBorderStyle(remoteSpeaking[user.uid], !isMyTurn).border,
-                    }}
-                  >
-                    {user.videoTrack ? (
-                      <div
-                        id={`remote-video-${user.uid}`}
-                        style={{ width: "100%", height: "100%" }}
-                      />
-                    ) : (
-                      // Show profile picture if no video
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "100%",
+                          fontWeight: "600",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                          gap: "8px",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                        }}
+                      >
+                        {speaking && (
+                          <span
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              background: "#10b981",
+                              borderRadius: "50%",
+                              animation: "pulse 1s infinite",
+                            }}
+                          ></span>
+                        )}
+                        {participant.isLocal ? "You" : isModeratorRole ? "👨‍⚖️ Moderator" : "Opponent"}
+                      </div>
+                    </div>
+
+                    {/* Debater Info Card */}
+                    {(isDebaterA || isDebaterB) && (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "16px",
+                          padding: "16px",
+                          background: isDebaterA
+                            ? "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)"
+                            : "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.05) 100%)",
+                          border: isDebaterA
+                            ? "1px solid rgba(59, 130, 246, 0.3)"
+                            : "1px solid rgba(239, 68, 68, 0.3)",
+                          borderRadius: "16px",
                         }}
                       >
                         <img
-                          src={remoteParticipant?.profileData?.photoURL}
-                          alt={remoteParticipant?.profileData?.username}
+                          src={participant.profileData?.photoURL}
+                          alt={participant.profileData?.username}
                           style={{
-                            width: "40%",
-                            height: "40%",
-                            borderRadius: "50%",
-                            objectFit: "cover",
-                            border: isModerator
-                              ? "4px solid rgba(147, 51, 234, 0.5)"
-                              : isDebaterA
-                              ? "4px solid rgba(59, 130, 246, 0.5)"
-                              : "4px solid rgba(239, 68, 68, 0.5)",
-                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                            width: "64px",
+                            height: "64px",
+                            borderRadius: "16px",
+                            border: isDebaterA
+                              ? "3px solid rgba(59, 130, 246, 0.5)"
+                              : "3px solid rgba(239, 68, 68, 0.5)",
+                            boxShadow: isDebaterA
+                              ? "0 4px 15px rgba(59, 130, 246, 0.3)"
+                              : "0 4px 15px rgba(239, 68, 68, 0.3)",
                           }}
                         />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: isDebaterA ? "#60a5fa" : "#f87171",
+                              fontWeight: "800",
+                              letterSpacing: "0.1em",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {isDebaterA ? "PRO" : "CON"}
+                          </div>
+                          <div
+                            style={{
+                              fontWeight: "700",
+                              color: "#fff",
+                              fontSize: "18px",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {participant.profileData?.username}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              color: "#94a3b8",
+                              fontWeight: "500",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {participant.sideDescription}
+                          </div>
+                        </div>
                       </div>
                     )}
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: "12px",
-                        left: "12px",
-                        background: "rgba(0, 0, 0, 0.7)",
-                        backdropFilter: "blur(10px)",
-                        padding: "8px 16px",
-                        borderRadius: "10px",
-                        color: "#fff",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                      }}
-                    >
-                      {remoteSpeaking[user.uid] && (
-                      <span
-                      style={{
-                      width: "8px",
-                      height: "8px",
-                      background: "#10b981",
-                      borderRadius: "50%",
-                      animation: "pulse 1s infinite",
-                      }}
-                      ></span>
-                      )}
-                      {isModerator ? "👨‍⚖️ Moderator" : "Opponent"}
-                    </div>
-                  </div>
-                  {/* Remote Participant Info Card */}
-                  {remoteParticipant && (isDebaterA || isDebaterB) && (
-                    <div
-                      style={{
-                        marginTop: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "16px",
-                        padding: "16px",
-                        background: isDebaterA
-                          ? "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)"
-                          : "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.05) 100%)",
-                        border: isDebaterA
-                          ? "1px solid rgba(59, 130, 246, 0.3)"
-                          : "1px solid rgba(239, 68, 68, 0.3)",
-                        borderRadius: "16px",
-                      }}
-                    >
-                      <img
-                        src={remoteParticipant.profileData?.photoURL}
-                        alt={remoteParticipant.profileData?.username}
-                        style={{
-                          width: "64px",
-                          height: "64px",
-                          borderRadius: "16px",
-                          border: isDebaterA
-                            ? "3px solid rgba(59, 130, 246, 0.5)"
-                            : "3px solid rgba(239, 68, 68, 0.5)",
-                          boxShadow: isDebaterA
-                            ? "0 4px 15px rgba(59, 130, 246, 0.3)"
-                            : "0 4px 15px rgba(239, 68, 68, 0.3)",
-                        }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: isDebaterA ? "#60a5fa" : "#f87171",
-                            fontWeight: "800",
-                            letterSpacing: "0.1em",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          {isDebaterA ? "PRO" : "CON"}
-                        </div>
-                        <div
-                          style={{
-                            fontWeight: "700",
-                            color: "#fff",
-                            fontSize: "18px",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          {remoteParticipant.profileData?.username}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            color: "#94a3b8",
-                            fontWeight: "500",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {remoteParticipant.sideDescription}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {/* Moderator Info Card */}
-                  {remoteParticipant && isModerator && (
-                    <div
-                      style={{
-                        marginTop: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "16px",
-                        padding: "16px",
-                        background: "linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(126, 34, 206, 0.05) 100%)",
-                        border: "1px solid rgba(147, 51, 234, 0.3)",
-                        borderRadius: "16px",
-                      }}
-                    >
-                      <img
-                        src={remoteParticipant.profileData?.photoURL}
-                        alt={remoteParticipant.profileData?.username}
-                        style={{
-                          width: "64px",
-                          height: "64px",
-                          borderRadius: "16px",
-                          border: "3px solid rgba(147, 51, 234, 0.5)",
-                          boxShadow: "0 4px 15px rgba(147, 51, 234, 0.3)",
-                        }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "#a78bfa",
-                            fontWeight: "800",
-                            letterSpacing: "0.1em",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          MODERATOR
-                        </div>
-                        <div
-                          style={{
-                            fontWeight: "700",
-                            color: "#fff",
-                            fontSize: "18px",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          {remoteParticipant.profileData?.username}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            color: "#94a3b8",
-                            fontWeight: "500",
-                          }}
-                        >
-                          Overseeing debate
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          ) : needsMedia && localVideoTrack ? (
-            <div
-              style={{
-                position: "relative",
-                borderRadius: "16px",
-                overflow: "hidden",
-                background:
-                  "linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(71, 85, 105, 0.1) 100%)",
-                aspectRatio: "16/9",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "2px dashed rgba(255, 255, 255, 0.1)",
-              }}
-            >
-              <div style={{ textAlign: "center" }}>
-                <div
-                  style={{
-                    fontSize: "64px",
-                    marginBottom: "16px",
-                    opacity: 0.3,
-                  }}
-                >
-                  ⏳
-                </div>
-                <p
-                  style={{
-                    color: "#64748b",
-                    fontSize: "16px",
-                    fontWeight: "600",
-                  }}
-                >
-                  Waiting for opponent...
-                </p>
-              </div>
-            </div>
-          ) : null}
 
-          {!needsMedia && remoteUsers.length === 0 && (
-            <div
-              style={{
-                gridColumn: "1 / -1",
-                position: "relative",
-                borderRadius: "16px",
-                overflow: "hidden",
-                background:
-                  "linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(71, 85, 105, 0.1) 100%)",
-                aspectRatio: "16/9",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "2px dashed rgba(255, 255, 255, 0.1)",
-              }}
-            >
-              <div style={{ textAlign: "center" }}>
+                    {/* Moderator Info Card */}
+                    {isModeratorRole && (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "16px",
+                          padding: "16px",
+                          background: "linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(126, 34, 206, 0.05) 100%)",
+                          border: "1px solid rgba(147, 51, 234, 0.3)",
+                          borderRadius: "16px",
+                        }}
+                      >
+                        <img
+                          src={participant.profileData?.photoURL}
+                          alt={participant.profileData?.username}
+                          style={{
+                            width: "64px",
+                            height: "64px",
+                            borderRadius: "16px",
+                            border: "3px solid rgba(147, 51, 234, 0.5)",
+                            boxShadow: "0 4px 15px rgba(147, 51, 234, 0.3)",
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "#a78bfa",
+                              fontWeight: "800",
+                              letterSpacing: "0.1em",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            MODERATOR
+                          </div>
+                          <div
+                            style={{
+                              fontWeight: "700",
+                              color: "#fff",
+                              fontSize: "18px",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {participant.profileData?.username}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              color: "#94a3b8",
+                              fontWeight: "500",
+                            }}
+                          >
+                            Overseeing debate
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Empty state - no participants */}
+              {gridParticipants.length === 0 && !needsMedia && (
                 <div
                   style={{
-                    fontSize: "80px",
-                    marginBottom: "20px",
-                    opacity: 0.3,
+                    gridColumn: "1 / -1",
+                    borderRadius: "16px",
+                    background: "linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(71, 85, 105, 0.1) 100%)",
+                    aspectRatio: "16/9",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "2px dashed rgba(255, 255, 255, 0.1)",
                   }}
                 >
-                  📹
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: "80px", marginBottom: "20px", opacity: 0.3 }}>📹</div>
+                    <p style={{ color: "#64748b", fontSize: "18px", fontWeight: "600", marginBottom: "8px" }}>
+                      Waiting for debaters...
+                    </p>
+                    <p style={{ color: "#475569", fontSize: "14px" }}>
+                      You're watching as a viewer
+                    </p>
+                  </div>
                 </div>
-                <p
-                  style={{
-                    color: "#64748b",
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Waiting for debaters...
-                </p>
-                <p style={{ color: "#475569", fontSize: "14px" }}>
-                  You're watching as a viewer
-                </p>
-              </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
 
-      {/* Moderator Control Panel - Only visible to the moderator */}
-      {isModerator && participants.moderator && (
+      {/* Moderator Control Panel - Visible based on debate structure */}
+      {hasModeratorControls && debateState && debateState.debateStarted && !debateState.debateEnded && (
         <div style={{ padding: "0 24px 24px" }}>
           <div
             style={{
@@ -1740,7 +1246,7 @@ const VideoDebateRoom = ({
               gap: "20px",
             }}
           >
-            {/* Moderator Info */}
+            {/* Control Info */}
             <div
               style={{
                 display: "flex",
@@ -1750,8 +1256,8 @@ const VideoDebateRoom = ({
               }}
             >
               <img
-                src={participants.moderator.profileData?.photoURL}
-                alt={participants.moderator.profileData?.username}
+                src={userProfile?.photoURL}
+                alt={userProfile?.username}
                 style={{
                   width: "56px",
                   height: "56px",
@@ -1770,7 +1276,7 @@ const VideoDebateRoom = ({
                     marginBottom: "4px",
                   }}
                 >
-                  MODERATOR
+                  {debate?.structure === 'self-moderated' ? 'HOST CONTROLS' : 'MODERATOR CONTROLS'}
                 </div>
                 <div
                   style={{
@@ -1780,7 +1286,7 @@ const VideoDebateRoom = ({
                     marginBottom: "2px",
                   }}
                 >
-                  {participants.moderator.profileData?.username}
+                  {userProfile?.username}
                 </div>
                 <div
                   style={{
@@ -1791,19 +1297,17 @@ const VideoDebateRoom = ({
                 >
                   {debateState?.paused
                     ? "⏸️ Debate Paused"
+                    : debate?.structure === 'self-moderated'
+                    ? "Moderating your debate"
                     : "Overseeing debate"}
                 </div>
               </div>
             </div>
 
-            {/* Moderator Controls - Only visible to moderator */}
-            {isModerator &&
-              debateState &&
-              debateState.debateStarted &&
-              !debateState.debateEnded && (
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  {/* Pause/Resume Button */}
-                  <button
+            {/* Moderator Controls */}
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {/* Pause/Resume Button */}
+              <button
                     onClick={async () => {
                       const { pauseDebate, resumeDebate } = await import(
                         "../../services/debateStateService"
@@ -1844,10 +1348,15 @@ const VideoDebateRoom = ({
                   {/* Add Time Button */}
                   <button
                     onClick={async () => {
-                      const { addTime } = await import(
-                        "../../services/debateStateService"
-                      );
-                      await addTime(debateId, 30);
+                      try {
+                        const { addTime } = await import(
+                          "../../services/debateStateService"
+                        );
+                        await addTime(debateId, 30);
+                        console.log('Successfully added 30 seconds');
+                      } catch (error) {
+                        console.error('Error adding time:', error);
+                      }
                     }}
                     style={{
                       padding: "10px 20px",
@@ -1939,30 +1448,46 @@ const VideoDebateRoom = ({
                   >
                     🛑 End Debate
                   </button>
-                </div>
-              )}
-
-            {/* Status indicator for non-moderators */}
-            {!isModerator && debateState?.paused && (
-              <div
-                style={{
-                  padding: "10px 20px",
-                  background: "rgba(245, 158, 11, 0.2)",
-                  border: "1px solid rgba(245, 158, 11, 0.3)",
-                  borderRadius: "10px",
-                  color: "#fbbf24",
-                  fontSize: "14px",
-                  fontWeight: "700",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
-                <span style={{ fontSize: "18px" }}>⏸️</span>
-                Paused by Moderator
-              </div>
-            )}
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Paused indicator for users without controls */}
+      {!hasModeratorControls && debateState?.paused && debateState.debateStarted && !debateState.debateEnded && (
+        <div style={{ padding: "0 24px 24px" }}>
+          <div
+            style={{
+              padding: "16px 24px",
+              background: "rgba(245, 158, 11, 0.2)",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+              borderRadius: "12px",
+              color: "#fbbf24",
+              fontSize: "14px",
+              fontWeight: "700",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            <span style={{ fontSize: "18px" }}>⏸️</span>
+            Debate Paused by {debate?.structure === 'self-moderated' ? 'Host' : 'Moderator'}
+          </div>
+        </div>
+      )}
+
+      {/* Waitlist Panel - Only for self-moderated debates */}
+      {debate?.structure === 'self-moderated' && (
+        <div style={{ padding: '0 24px 24px' }}>
+          <WaitlistPanel
+            debateId={debateId}
+            currentUser={currentUser}
+            userProfile={userProfile}
+            isHost={isHost}
+            debaterB={participants.debater_b}
+            debateStructure={debate?.structure}
+          />
         </div>
       )}
 

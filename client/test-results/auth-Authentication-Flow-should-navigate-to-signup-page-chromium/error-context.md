@@ -1,0 +1,48 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - link "DEBATE APP" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e8]: DEBATE APP
+      - navigation [ref=e9]:
+        - link "Home" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "Browse Debates" [ref=e11] [cursor=pointer]:
+          - /url: /browse
+        - link "Login" [ref=e12] [cursor=pointer]:
+          - /url: /login
+        - link "Sign Up" [active] [ref=e13] [cursor=pointer]:
+          - /url: /signup
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - heading "Create your account" [level=2] [ref=e17]
+      - paragraph [ref=e18]:
+        - text: Or
+        - link "sign in to existing account" [ref=e19] [cursor=pointer]:
+          - /url: /login
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: Username
+          - textbox "Username" [ref=e24]
+        - generic [ref=e25]:
+          - generic [ref=e26]: Email address
+          - textbox "Email address" [ref=e27]
+        - generic [ref=e28]:
+          - generic [ref=e29]: Password
+          - textbox "Password" [ref=e30]:
+            - /placeholder: Password (min 6 characters)
+        - generic [ref=e31]:
+          - generic [ref=e32]: Confirm Password
+          - textbox "Confirm Password" [ref=e33]:
+            - /placeholder: Confirm password
+      - button "Sign up" [ref=e35] [cursor=pointer]
+    - generic [ref=e36]:
+      - generic [ref=e39]: Or continue with
+      - button "Sign up with Google" [ref=e41] [cursor=pointer]:
+        - img [ref=e42]
+        - text: Sign up with Google
+```
