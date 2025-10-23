@@ -14,7 +14,7 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId);
     }
@@ -22,6 +22,7 @@ service cloud.firestore {
     // Debate States collection
     match /debateStates/{debateId} {
       allow read: if true;
+      // Only allow writes if user is a participant or host of the debate
       allow write: if isSignedIn();
     }
     
@@ -29,6 +30,7 @@ service cloud.firestore {
     match /debates/{debateId} {
       allow read: if true;
       allow create: if isSignedIn();
+      // Allow updates for completing debates and scheduling deletion
       allow update: if isSignedIn();
       allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
       

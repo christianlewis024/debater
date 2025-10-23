@@ -262,7 +262,12 @@ const VideoDebateRoom = ({
       setJoined(true);
       setJoining(false);
     } catch (err) {
-      setError(`Failed to join: ${err.message}`);
+      // Hide UID conflict errors from UI (log only)
+      if (err.code === 'UID_CONFLICT' || err.message?.toLowerCase().includes('uid_conflict')) {
+        console.error('Agora UID conflict error:', err);
+      } else {
+        setError(`Failed to join: ${err.message}`);
+      }
       setJoining(false);
       hasJoinedRef.current = false;
     }
@@ -1353,7 +1358,6 @@ const VideoDebateRoom = ({
                           "../../services/debateStateService"
                         );
                         await addTime(debateId, 30);
-                        console.log('Successfully added 30 seconds');
                       } catch (error) {
                         console.error('Error adding time:', error);
                       }

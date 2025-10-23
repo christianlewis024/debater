@@ -24,10 +24,9 @@ const BrowseDebatesPage = () => {
   ];
 
   useEffect(() => {
-    console.log('Setting up debate subscription...');
     setLoading(true);
     setError('');
-    
+
     const filters = {};
     if (categoryFilter !== 'all') {
       filters.category = categoryFilter;
@@ -38,7 +37,6 @@ const BrowseDebatesPage = () => {
 
     try {
       const unsubscribe = subscribeToDebates((debatesData) => {
-        console.log('Received debates:', debatesData);
         // Filter out debates older than 24 hours
         const recentDebates = debatesData.filter(debate => !isDebateOld(debate.createdAt));
         setDebates(recentDebates);
@@ -46,7 +44,6 @@ const BrowseDebatesPage = () => {
       }, filters);
 
       return () => {
-        console.log('Cleaning up subscription');
         unsubscribe();
       };
     } catch (err) {
@@ -127,7 +124,7 @@ const BrowseDebatesPage = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
+      background: 'linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)',
       fontFamily: "'Inter', sans-serif",
       padding: '40px 20px'
     }}>
@@ -153,7 +150,7 @@ const BrowseDebatesPage = () => {
           WebkitTextFillColor: 'transparent',
           letterSpacing: '-0.02em'
         }}>
-          Browse Debates
+          Browse Klashes
         </h1>
 
         {/* Filters */}

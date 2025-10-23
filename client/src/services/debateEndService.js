@@ -13,14 +13,11 @@ import {
 // Handle debate completion and winner calculation
 export const handleDebateEnd = async (debateId) => {
   try {
-    console.log('🏁 Handling debate end for:', debateId);
-
     // Get debate data
     const debateRef = doc(db, 'debates', debateId);
     const debateSnap = await getDoc(debateRef);
-    
+
     if (!debateSnap.exists()) {
-      console.log('Debate not found');
       return;
     }
 
@@ -43,7 +40,6 @@ export const handleDebateEnd = async (debateId) => {
     const debaterB = participants.debater_b;
 
     if (!debaterA || !debaterB) {
-      console.log('Missing debaters, cannot calculate winner');
       return;
     }
 
@@ -62,8 +58,6 @@ export const handleDebateEnd = async (debateId) => {
         votesForB++;
       }
     });
-
-    console.log('📊 Vote count:', { debaterA: votesForA, debaterB: votesForB });
 
     // Determine winner
     let winnerId = null;
@@ -98,8 +92,6 @@ export const handleDebateEnd = async (debateId) => {
       updatedAt: serverTimestamp()
     });
 
-    console.log('✅ Stats updated for both debaters');
-
     // Mark debate as completed with results
     await updateDoc(debateRef, {
       status: 'completed',
@@ -120,8 +112,6 @@ export const handleDebateEnd = async (debateId) => {
       }
     });
 
-    console.log('🎉 Debate marked as completed');
-
     return {
       winnerId,
       loserId,
@@ -129,15 +119,13 @@ export const handleDebateEnd = async (debateId) => {
       votesForB
     };
   } catch (error) {
-    console.error('❌ Error handling debate end:', error);
+    console.error('Error handling debate end:', error);
     throw error;
   }
 };
 
 // Schedule debate deletion after voting period
 export const scheduleDebateDeletion = async (debateId, delayMinutes = 30) => {
-  console.log(`⏰ Scheduling debate deletion in ${delayMinutes} minutes`);
-  
   // Mark debate for deletion
   const debateRef = doc(db, 'debates', debateId);
   await updateDoc(debateRef, {
@@ -148,8 +136,6 @@ export const scheduleDebateDeletion = async (debateId, delayMinutes = 30) => {
 // Delete debate and all subcollections
 export const deleteDebate = async (debateId) => {
   try {
-    console.log('🗑️ Deleting debate:', debateId);
-
     // Delete subcollections
     const subcollections = ['participants', 'votes', 'messages', 'turns', 'references'];
     
@@ -166,15 +152,13 @@ export const deleteDebate = async (debateId) => {
     try {
       await deleteDoc(doc(db, 'debateStates', debateId));
     } catch (e) {
-      console.log('No debate state to delete');
+      // Debate state may not exist
     }
 
     // Delete main debate document
     await deleteDoc(doc(db, 'debates', debateId));
-
-    console.log('✅ Debate deleted successfully');
   } catch (error) {
-    console.error('❌ Error deleting debate:', error);
+    console.error('Error deleting debate:', error);
     throw error;
   }
 };
@@ -192,9 +176,8 @@ export const cleanupOldDebates = async () => {
       
       if (data.scheduledDeletion) {
         const deletionTime = data.scheduledDeletion.toMillis();
-        
+
         if (now >= deletionTime) {
-          console.log('Cleaning up old debate:', document.id);
           await deleteDebate(document.id);
         }
       }

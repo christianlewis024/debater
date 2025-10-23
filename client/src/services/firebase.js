@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
 
 const firebaseConfig = {
@@ -21,6 +21,23 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const rtdb = getDatabase(app);
+
+// Enable offline persistence with error handling
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db, {
+    forceOwnership: true
+  }).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      // Multiple tabs open, persistence can only be enabled in one tab at a time
+      console.warn('Multiple tabs open, persistence disabled');
+    } else if (err.code === 'unimplemented') {
+      // Browser doesn't support persistence
+      console.warn('Browser does not support persistence');
+    } else {
+      console.error('Error enabling persistence:', err);
+    }
+  });
+}
 
 // Connect to Firebase Emulators if in development mode
 if (process.env.REACT_APP_USE_EMULATORS === 'true') {

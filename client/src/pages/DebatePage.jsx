@@ -28,6 +28,13 @@ const DebatePage = () => {
   const debaterB = participants.debater_b;
   const moderator = participants.moderator;
 
+  // Check if current user is already a participant
+  const isParticipant = currentUser && (
+    debaterA?.userId === currentUser.uid ||
+    debaterB?.userId === currentUser.uid ||
+    moderator?.userId === currentUser.uid
+  );
+
   // Set default join side based on available slots
   useEffect(() => {
     if (!debaterA) {
@@ -51,7 +58,6 @@ const DebatePage = () => {
     });
 
     const unsubParticipants = subscribeToParticipants(debateId, (participantsData) => {
-      console.log('👥 Participants updated:', participantsData);
       setParticipants(participantsData);
     });
 
@@ -84,19 +90,15 @@ const DebatePage = () => {
       
       // Check if already processed
       if (debate?.status === 'completed') return;
-      
-      console.log('🏁 Debate ended - starting 30 minute voting period');
-      
+
       try {
         // Calculate winner and update stats
         await handleDebateEnd(debateId);
-        
+
         // Schedule deletion in 30 minutes
         await scheduleDebateDeletion(debateId, 30);
-        
-        console.log('✅ Debate results processed, will be deleted in 30 minutes');
       } catch (error) {
-        console.error('❌ Error processing debate end:', error);
+        console.error('Error processing debate end:', error);
       }
     };
     
@@ -109,13 +111,6 @@ const DebatePage = () => {
       return;
     }
 
-    console.log('🎯 Attempting to join debate:', {
-      debateId,
-      userId: currentUser.uid,
-      role: joinSide,
-      currentParticipants: participants
-    });
-
     try {
       await joinDebate(
         debateId,
@@ -124,46 +119,22 @@ const DebatePage = () => {
         joinSide,
         sideDescription
       );
-      console.log('✅ Successfully joined as:', joinSide);
       setShowJoinModal(false);
       setSideDescription('');
     } catch (error) {
-      console.error('❌ Error joining debate:', error);
+      console.error('Error joining debate:', error);
       setError('Failed to join debate');
-    }
-  };
-
-  const cleanupParticipants = async () => {
-    if (!window.confirm('This will remove ALL participants from this debate. Continue?')) {
-      return;
-    }
-    try {
-      const { collection, getDocs, deleteDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
-      
-      const participantsRef = collection(db, `debates/${debateId}/participants`);
-      const snapshot = await getDocs(participantsRef);
-      
-      for (const document of snapshot.docs) {
-        await deleteDoc(doc(db, `debates/${debateId}/participants`, document.id));
-        console.log('🗑️ Deleted participant:', document.id);
-      }
-      
-      alert('All participants cleared!');
-    } catch (error) {
-      console.error('Error cleaning up:', error);
-      alert('Failed to cleanup: ' + error.message);
     }
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            display: 'inline-block', 
-            width: '60px', 
-            height: '60px', 
+          <div style={{
+            display: 'inline-block',
+            width: '60px',
+            height: '60px',
             border: '4px solid rgba(59, 130, 246, 0.2)',
             borderTop: '4px solid #3b82f6',
             borderRadius: '50%',
@@ -178,7 +149,7 @@ const DebatePage = () => {
 
   if (!debate) {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '20px', color: '#fff' }}>Debate not found</h2>
           <button
@@ -204,7 +175,7 @@ const DebatePage = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)' }}>
       {/* Animated Background */}
       <div style={{
         position: 'fixed',
@@ -306,36 +277,36 @@ const DebatePage = () => {
 
             {/* Waiting State */}
             {debate.status === 'waiting' && (!debaterA || !debaterB || !moderator) && (
-              <div style={{ 
-                background: 'rgba(17, 24, 39, 0.6)', 
+              <div style={{
+                background: 'rgba(17, 24, 39, 0.6)',
                 backdropFilter: 'blur(20px)',
-                borderRadius: '20px', 
-                border: '1px solid rgba(255, 255, 255, 0.08)', 
-                padding: '48px', 
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                padding: '48px',
                 textAlign: 'center',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
               }}>
                 <div style={{ fontSize: '80px', marginBottom: '24px' }}>⏳</div>
-                <h2 style={{ 
-                  fontSize: '28px', 
-                  fontWeight: '800', 
-                  color: '#fff', 
+                <h2 style={{
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  color: '#fff',
                   marginBottom: '12px',
                   letterSpacing: '-0.02em'
                 }}>
                   {(!debaterA || !debaterB) ? 'Waiting for Debaters' : 'Waiting for Moderator'}
                 </h2>
                 <p style={{ color: '#94a3b8', marginBottom: '32px', fontSize: '16px', fontWeight: '500' }}>
-                  {!debaterA && !debaterB ? 'Need 2 debaters to start' : 
+                  {!debaterA && !debaterB ? 'Need 2 debaters to start' :
                    (!debaterA || !debaterB) ? 'Need 1 more debater' :
                    'Moderator needed to oversee the debate'}
                 </p>
-                {currentUser ? (
+                {currentUser && !isParticipant ? (
                   <button
                     onClick={() => setShowJoinModal(true)}
                     disabled={debaterA && debaterB && moderator}
                     style={{
-                      background: (debaterA && debaterB && moderator) 
+                      background: (debaterA && debaterB && moderator)
                         ? 'rgba(100, 116, 139, 0.3)'
                         : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       color: '#fff',
@@ -345,18 +316,18 @@ const DebatePage = () => {
                       fontSize: '17px',
                       border: 'none',
                       cursor: (debaterA && debaterB && moderator) ? 'not-allowed' : 'pointer',
-                      boxShadow: (debaterA && debaterB && moderator) 
-                        ? 'none' 
+                      boxShadow: (debaterA && debaterB && moderator)
+                        ? 'none'
                         : '0 8px 30px rgba(59, 130, 246, 0.4)',
                       opacity: (debaterA && debaterB && moderator) ? 0.5 : 1,
                       transition: 'all 0.3s ease'
                     }}
                   >
-                    {(!debaterA || !debaterB) ? 'Join as Debater' : 
+                    {(!debaterA || !debaterB) ? 'Join as Debater' :
                      !moderator ? 'Join as Moderator' :
                      'All Slots Filled'}
                   </button>
-                ) : (
+                ) : !currentUser ? (
                   <button
                     onClick={() => navigate('/login')}
                     style={{
@@ -374,6 +345,10 @@ const DebatePage = () => {
                   >
                     Login to Join
                   </button>
+                ) : (
+                  <p style={{ color: '#10b981', fontSize: '16px', fontWeight: '600' }}>
+                    ✓ You've joined this Klash
+                  </p>
                 )}
               </div>
             )}
@@ -422,27 +397,6 @@ const DebatePage = () => {
               >
                 ← Back to Browse
               </button>
-              
-              {/* Debug: Cleanup Button */}
-              {currentUser && (
-                <button
-                  onClick={cleanupParticipants}
-                  style={{
-                    width: '100%',
-                    padding: '12px 20px',
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
-                    borderRadius: '12px',
-                    fontWeight: '600',
-                    fontSize: '13px',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  🗑️ Clear All Participants (Debug)
-                </button>
-              )}
             </div>
           </div>
         </div>

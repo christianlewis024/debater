@@ -27,21 +27,23 @@ const Header = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Logo and Title */}
-          <Link to="/" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '12px', 
-            textDecoration: 'none' 
+          <Link to="/" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            textDecoration: 'none'
           }}>
-            <div style={{ 
-              fontSize: '32px', 
+            <div style={{
+              fontSize: '36px',
               fontWeight: '900',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.02em'
+              letterSpacing: '-0.03em',
+              textTransform: 'uppercase',
+              position: 'relative'
             }}>
-              DEBATE APP
+              KLASH
             </div>
           </Link>
 
@@ -62,11 +64,11 @@ const Header = () => {
               Home
             </Link>
             
-            <Link 
-              to="/browse" 
-              style={{ 
-                color: '#e2e8f0', 
-                textDecoration: 'none', 
+            <Link
+              to="/browse"
+              style={{
+                color: '#e2e8f0',
+                textDecoration: 'none',
                 fontWeight: '600',
                 fontSize: '15px',
                 transition: 'color 0.2s ease'
@@ -74,16 +76,16 @@ const Header = () => {
               onMouseEnter={(e) => e.target.style.color = '#fff'}
               onMouseLeave={(e) => e.target.style.color = '#e2e8f0'}
             >
-              Browse Debates
+              Browse
             </Link>
 
             {currentUser ? (
               <>
-                <Link 
-                  to="/create" 
-                  style={{ 
-                    color: '#e2e8f0', 
-                    textDecoration: 'none', 
+                <Link
+                  to="/create"
+                  style={{
+                    color: '#e2e8f0',
+                    textDecoration: 'none',
                     fontWeight: '600',
                     fontSize: '15px',
                     transition: 'color 0.2s ease'
@@ -91,7 +93,7 @@ const Header = () => {
                   onMouseEnter={(e) => e.target.style.color = '#fff'}
                   onMouseLeave={(e) => e.target.style.color = '#e2e8f0'}
                 >
-                  Create Debate
+                  Create
                 </Link>
                 <Link 
                   to="/profile" 

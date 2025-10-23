@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
     });
 
     // Create user profile in Firestore
-    await setDoc(doc(db, 'users', user.uid), {
+    const userProfileData = {
       uid: user.uid,
       email: user.email,
       username: username,
@@ -64,7 +64,12 @@ export const AuthProvider = ({ children }) => {
         totalVotesReceived: 0, // New: track total votes across all debates
         totalVotesCast: 0 // New: track how many votes they've cast
       }
-    });
+    };
+
+    await setDoc(doc(db, 'users', user.uid), userProfileData);
+
+    // Immediately set the user profile in state
+    setUserProfile(userProfileData);
 
     return user;
   };
@@ -84,8 +89,8 @@ export const AuthProvider = ({ children }) => {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) {
       const photoURL = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(getRandomEmoji())}&background=random&size=200&font-size=0.6`;
-      
-      await setDoc(doc(db, 'users', user.uid), {
+
+      const userProfileData = {
         uid: user.uid,
         email: user.email,
         username: user.displayName || user.email.split('@')[0],
@@ -102,16 +107,25 @@ export const AuthProvider = ({ children }) => {
           totalVotesReceived: 0,
           totalVotesCast: 0
         }
-      });
+      };
+
+      await setDoc(doc(db, 'users', user.uid), userProfileData);
+
+      // Immediately set the user profile in state
+      setUserProfile(userProfileData);
     } else {
       // Update with Google photo if it changed
       const existingData = userDoc.data();
       if (user.photoURL && user.photoURL !== existingData.photoURL) {
-        await setDoc(doc(db, 'users', user.uid), {
+        const updatedData = {
           ...existingData,
           photoURL: user.photoURL,
           updatedAt: new Date()
-        }, { merge: true });
+        };
+        await setDoc(doc(db, 'users', user.uid), updatedData, { merge: true });
+        setUserProfile(updatedData);
+      } else {
+        setUserProfile(existingData);
       }
     }
 

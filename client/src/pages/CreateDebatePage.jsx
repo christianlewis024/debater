@@ -69,7 +69,7 @@ const CreateDebatePage = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
+        background: 'linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -77,7 +77,7 @@ const CreateDebatePage = () => {
       }}>
         <div style={{ textAlign: 'center' }}>
           <h2 style={{ fontSize: '32px', fontWeight: '800', color: '#fff', marginBottom: '24px' }}>
-            Please log in to create a debate
+            Please log in to create a Klash
           </h2>
           <button
             onClick={() => navigate('/login')}
@@ -103,7 +103,7 @@ const CreateDebatePage = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
+      background: 'linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%)',
       fontFamily: "'Inter', sans-serif",
       padding: '60px 20px'
     }}>
@@ -138,7 +138,7 @@ const CreateDebatePage = () => {
             WebkitTextFillColor: 'transparent',
             letterSpacing: '-0.02em'
           }}>
-            Create a New Debate
+            Create a New Klash
           </h1>
           <p style={{ 
             textAlign: 'center', 
@@ -444,7 +444,7 @@ const CreateDebatePage = () => {
                   e.target.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
                 }}
               >
-                {loading ? '🔄 Creating...' : '🚀 Create Debate'}
+                {loading ? '🔄 Creating...' : '🚀 Create Klash'}
               </button>
             </div>
           </form>
