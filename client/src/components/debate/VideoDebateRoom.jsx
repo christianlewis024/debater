@@ -43,6 +43,8 @@ const VideoDebateRoom = ({
   const clientRef = useRef(null);
   const localVideoContainerRef = useRef(null);
   const hasJoinedRef = useRef(false);
+  const localAudioTrackRef = useRef(null);
+  const localVideoTrackRef = useRef(null);
 
   // Custom hooks for debate state management
   const debateState = useDebateState(debateId, participants, debate);
@@ -71,6 +73,18 @@ const VideoDebateRoom = ({
 
   // Moderators also get video/audio like debaters
   const needsMedia = isDebater || isModerator;
+
+  // DEBUG: Log needsMedia calculation
+  console.log('🔍 needsMedia calculation:', {
+    needsMedia,
+    isDebater,
+    isModerator,
+    currentUserId: currentUser?.uid,
+    debater_a: participants.debater_a?.userId,
+    debater_b: participants.debater_b?.userId,
+    moderator: participants.moderator?.userId,
+    participants: participants
+  });
 
   const myRole =
     participants.debater_a?.userId === currentUser?.uid
@@ -210,8 +224,21 @@ const VideoDebateRoom = ({
   };
 
   const joinChannel = async () => {
-    if (!currentUser || !debateId || !appId || joining || hasJoinedRef.current)
+    console.log('🟢 joinChannel called', {
+      hasCurrentUser: !!currentUser,
+      debateId,
+      hasAppId: !!appId,
+      joining,
+      hasJoined: hasJoinedRef.current,
+      needsMedia,
+      isDebater,
+      isModerator
+    });
+
+    if (!currentUser || !debateId || !appId || joining || hasJoinedRef.current) {
+      console.log('❌ joinChannel blocked');
       return;
+    }
 
     try {
       hasJoinedRef.current = true;
@@ -221,15 +248,22 @@ const VideoDebateRoom = ({
       let audioTrack = null;
       let videoTrack = null;
 
+      console.log('📹 About to create tracks, needsMedia:', needsMedia);
+
       if (needsMedia) {
+        console.log('✅ needsMedia is TRUE, creating tracks...');
       const tracks = await createTracks();
       audioTrack = tracks.audioTrack;
       videoTrack = tracks.videoTrack;
 
       // Set tracks if they were created
-      if (audioTrack) setLocalAudioTrack(audioTrack);
+      if (audioTrack) {
+        setLocalAudioTrack(audioTrack);
+        localAudioTrackRef.current = audioTrack;
+      }
       if (videoTrack) {
         setLocalVideoTrack(videoTrack);
+        localVideoTrackRef.current = videoTrack;
       if (localVideoContainerRef.current) {
       localVideoContainerRef.current.innerHTML = "";
       videoTrack.play(localVideoContainerRef.current);
@@ -244,7 +278,9 @@ const VideoDebateRoom = ({
       } else if (!audioTrack) {
         setError("No microphone detected. Others can see you but not hear you.");
       }
-    }
+    } else {
+        console.log('⚠️ needsMedia is FALSE, skipping track creation (viewer mode)');
+      }
 
       await client.join(appId, debateId, null, currentUser.uid);
 
@@ -274,17 +310,22 @@ const VideoDebateRoom = ({
   };
 
   const leaveChannel = async () => {
+    console.log('👋 leaveChannel called');
     try {
       // Stop and close local tracks
       if (localAudioTrack) {
+        console.log('🔇 Stopping local audio track');
         localAudioTrack.stop();
         localAudioTrack.close();
         setLocalAudioTrack(null);
+        localAudioTrackRef.current = null;
       }
       if (localVideoTrack) {
+        console.log('📹 Stopping local video track');
         localVideoTrack.stop();
         localVideoTrack.close();
         setLocalVideoTrack(null);
+        localVideoTrackRef.current = null;
       }
 
       // Stop all remote tracks
@@ -295,14 +336,16 @@ const VideoDebateRoom = ({
 
       // Leave Agora channel
       if (client && joined) {
+        console.log('🚪 Leaving Agora channel');
         await client.leave();
       }
 
       setJoined(false);
       setRemoteUsers([]);
       hasJoinedRef.current = false;
+      console.log('✅ leaveChannel complete');
     } catch (err) {
-      console.error("Error leaving:", err);
+      console.error("❌ Error leaving:", err);
     }
   };
 
@@ -423,12 +466,14 @@ const VideoDebateRoom = ({
       !joined &&
       !joining &&
       debateId &&
-      !hasJoinedRef.current
+      !hasJoinedRef.current &&
+      participants // Wait for participant data to load
     ) {
+      console.log('⏰ Scheduling joinChannel in 1 second...');
       const timer = setTimeout(() => joinChannel(), 1000);
       return () => clearTimeout(timer);
     }
-  }, [currentUser, debateId]);
+  }, [currentUser, debateId, participants]);
 
   // Auto-rejoin when user becomes a participant with media (debater or moderator)
   const prevNeedsMediaRef = useRef(needsMedia);
@@ -452,10 +497,46 @@ const VideoDebateRoom = ({
   }, [needsMedia, joined]);
 
   useEffect(() => {
+    console.log('🎬 VideoDebateRoom mounted');
+
     return () => {
-      if (joined || hasJoinedRef.current) leaveChannel();
+      console.log('🚪 VideoDebateRoom unmounting, cleaning up...', {
+        hasJoinedRef: hasJoinedRef.current,
+        hasLocalAudioRef: !!localAudioTrackRef.current,
+        hasLocalVideoRef: !!localVideoTrackRef.current
+      });
+
+      // Use refs to avoid stale closure - always cleanup if we have tracks or joined
+      if (hasJoinedRef.current || localAudioTrackRef.current || localVideoTrackRef.current) {
+        console.log('📞 Cleaning up tracks and leaving channel');
+
+        // Stop and close tracks using refs
+        if (localAudioTrackRef.current) {
+          console.log('🔇 Stopping audio track from ref');
+          localAudioTrackRef.current.stop();
+          localAudioTrackRef.current.close();
+          localAudioTrackRef.current = null;
+        }
+        if (localVideoTrackRef.current) {
+          console.log('📹 Stopping video track from ref');
+          localVideoTrackRef.current.stop();
+          localVideoTrackRef.current.close();
+          localVideoTrackRef.current = null;
+        }
+
+        // Leave Agora channel
+        if (hasJoinedRef.current && clientRef.current) {
+          console.log('🚪 Leaving Agora channel from cleanup');
+          clientRef.current.leave();
+          hasJoinedRef.current = false;
+        }
+
+        console.log('✅ Cleanup complete');
+      } else {
+        console.log('⚠️ Nothing to clean up');
+      }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     remoteUsers.forEach((user) => {
@@ -479,15 +560,15 @@ const VideoDebateRoom = ({
   const getBorderStyle = (isSpeaking, isUserTurn) => {
     if (isSpeaking) {
       return {
-        border: "3px solid #10b981",
+        border: "5px solid #10b981",
         boxShadow:
-          "0 0 30px rgba(16, 185, 129, 0.6), 0 0 60px rgba(16, 185, 129, 0.3)",
+          "0 0 40px rgba(16, 185, 129, 1), 0 0 80px rgba(16, 185, 129, 0.6), inset 0 0 20px rgba(16, 185, 129, 0.2)",
       };
     }
     if (isUserTurn) {
       return {
-        border: "3px solid #3b82f6",
-        boxShadow: "0 4px 20px rgba(59, 130, 246, 0.5)",
+        border: "5px solid #3b82f6",
+        boxShadow: "0 0 40px rgba(59, 130, 246, 1), 0 0 80px rgba(59, 130, 246, 0.6), inset 0 0 20px rgba(59, 130, 246, 0.2)",
       };
     }
     return {
@@ -670,6 +751,31 @@ const VideoDebateRoom = ({
         </div>
 
         <div style={{ display: "flex", gap: "10px" }}>
+          {/* Rejoin button for debaters/moderators who are not connected */}
+          {needsMedia && !joined && !joining && (
+            <button
+              onClick={async () => {
+                console.log('🔄 Manual rejoin requested');
+                hasJoinedRef.current = false;
+                await joinChannel();
+              }}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "10px",
+                fontWeight: "600",
+                fontSize: "14px",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                color: "#fff",
+                boxShadow: "0 4px 15px rgba(16, 185, 129, 0.4)",
+              }}
+            >
+              🔄 Rejoin Call
+            </button>
+          )}
+
           {needsMedia && localAudioTrack && (
             <>
               <button
@@ -990,18 +1096,37 @@ const VideoDebateRoom = ({
                               justifyContent: "center",
                             }}
                           >
-                            <img
-                              src={participant.profileData?.photoURL}
-                              alt={participant.profileData?.username}
-                              style={{
+                            {participant.profileData?.photoURL && participant.profileData.photoURL.length <= 2 ? (
+                              <div style={{
                                 width: "40%",
                                 height: "40%",
                                 borderRadius: "50%",
-                                objectFit: "cover",
                                 border: isDebaterA ? "4px solid rgba(59, 130, 246, 0.5)" : "4px solid rgba(239, 68, 68, 0.5)",
                                 boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
-                              }}
-                            />
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "120px",
+                                background: isDebaterA
+                                  ? "linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)"
+                                  : "linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%)"
+                              }}>
+                                {participant.profileData.photoURL}
+                              </div>
+                            ) : (
+                              <img
+                                src={participant.profileData?.photoURL || 'https://ui-avatars.com/api/?name=' + (participant.profileData?.username || 'User')}
+                                alt={participant.profileData?.username}
+                                style={{
+                                  width: "40%",
+                                  height: "40%",
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                  border: isDebaterA ? "4px solid rgba(59, 130, 246, 0.5)" : "4px solid rgba(239, 68, 68, 0.5)",
+                                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                                }}
+                              />
+                            )}
                           </div>
                         )
                       ) : (
@@ -1017,24 +1142,78 @@ const VideoDebateRoom = ({
                               justifyContent: "center",
                             }}
                           >
-                            <img
-                              src={participant.profileData?.photoURL}
-                              alt={participant.profileData?.username}
-                              style={{
+                            {participant.profileData?.photoURL && participant.profileData.photoURL.length <= 2 ? (
+                              <div style={{
                                 width: "40%",
                                 height: "40%",
                                 borderRadius: "50%",
-                                objectFit: "cover",
                                 border: isModeratorRole
                                   ? "4px solid rgba(147, 51, 234, 0.5)"
                                   : isDebaterA
                                   ? "4px solid rgba(59, 130, 246, 0.5)"
                                   : "4px solid rgba(239, 68, 68, 0.5)",
                                 boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
-                              }}
-                            />
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "120px",
+                                background: isModeratorRole
+                                  ? "linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(126, 34, 206, 0.2) 100%)"
+                                  : isDebaterA
+                                  ? "linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)"
+                                  : "linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%)"
+                              }}>
+                                {participant.profileData.photoURL}
+                              </div>
+                            ) : (
+                              <img
+                                src={participant.profileData?.photoURL || 'https://ui-avatars.com/api/?name=' + (participant.profileData?.username || 'User')}
+                                alt={participant.profileData?.username}
+                                style={{
+                                  width: "40%",
+                                  height: "40%",
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                  border: isModeratorRole
+                                    ? "4px solid rgba(147, 51, 234, 0.5)"
+                                    : isDebaterA
+                                    ? "4px solid rgba(59, 130, 246, 0.5)"
+                                    : "4px solid rgba(239, 68, 68, 0.5)",
+                                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                                }}
+                              />
+                            )}
                           </div>
                         )
+                      )}
+
+                      {/* Turn Indicator Badge - Top Center */}
+                      {isTurn && debateState?.debateStarted && !debateState?.debateEnded && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "12px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                            padding: "10px 24px",
+                            borderRadius: "12px",
+                            color: "#fff",
+                            fontSize: "15px",
+                            fontWeight: "800",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            border: "2px solid rgba(255, 255, 255, 0.3)",
+                            boxShadow: "0 4px 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.5)",
+                            animation: "pulse 2s infinite",
+                            letterSpacing: "0.05em",
+                            textTransform: "uppercase"
+                          }}
+                        >
+                          <span style={{ fontSize: "18px" }}>🎤</span>
+                          Your Turn
+                        </div>
                       )}
 
                       {/* Name Tag Overlay */}
@@ -1043,7 +1222,7 @@ const VideoDebateRoom = ({
                           position: "absolute",
                           bottom: "12px",
                           left: "12px",
-                          background: "rgba(0, 0, 0, 0.7)",
+                          background: speaking ? "rgba(16, 185, 129, 0.9)" : "rgba(0, 0, 0, 0.7)",
                           backdropFilter: "blur(10px)",
                           padding: "8px 16px",
                           borderRadius: "10px",
@@ -1053,21 +1232,24 @@ const VideoDebateRoom = ({
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          border: speaking ? "2px solid #10b981" : "1px solid rgba(255, 255, 255, 0.1)",
+                          transition: "all 0.3s ease",
+                          boxShadow: speaking ? "0 0 20px rgba(16, 185, 129, 0.8)" : "none"
                         }}
                       >
                         {speaking && (
                           <span
                             style={{
-                              width: "8px",
-                              height: "8px",
-                              background: "#10b981",
+                              width: "10px",
+                              height: "10px",
+                              background: "#fff",
                               borderRadius: "50%",
                               animation: "pulse 1s infinite",
                             }}
                           ></span>
                         )}
                         {participant.isLocal ? "You" : isModeratorRole ? "👨‍⚖️ Moderator" : "Opponent"}
+                        {speaking && <span style={{ fontWeight: "800", marginLeft: "4px" }}>SPEAKING</span>}
                       </div>
                     </div>
 
@@ -1089,10 +1271,8 @@ const VideoDebateRoom = ({
                           borderRadius: "16px",
                         }}
                       >
-                        <img
-                          src={participant.profileData?.photoURL}
-                          alt={participant.profileData?.username}
-                          style={{
+                        {participant.profileData?.photoURL && participant.profileData.photoURL.length <= 2 ? (
+                          <div style={{
                             width: "64px",
                             height: "64px",
                             borderRadius: "16px",
@@ -1102,8 +1282,33 @@ const VideoDebateRoom = ({
                             boxShadow: isDebaterA
                               ? "0 4px 15px rgba(59, 130, 246, 0.3)"
                               : "0 4px 15px rgba(239, 68, 68, 0.3)",
-                          }}
-                        />
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "36px",
+                            background: isDebaterA
+                              ? "linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)"
+                              : "linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%)"
+                          }}>
+                            {participant.profileData.photoURL}
+                          </div>
+                        ) : (
+                          <img
+                            src={participant.profileData?.photoURL || 'https://ui-avatars.com/api/?name=' + (participant.profileData?.username || 'User')}
+                            alt={participant.profileData?.username}
+                            style={{
+                              width: "64px",
+                              height: "64px",
+                              borderRadius: "16px",
+                              border: isDebaterA
+                                ? "3px solid rgba(59, 130, 246, 0.5)"
+                                : "3px solid rgba(239, 68, 68, 0.5)",
+                              boxShadow: isDebaterA
+                                ? "0 4px 15px rgba(59, 130, 246, 0.3)"
+                                : "0 4px 15px rgba(239, 68, 68, 0.3)",
+                            }}
+                          />
+                        )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
@@ -1156,17 +1361,34 @@ const VideoDebateRoom = ({
                           borderRadius: "16px",
                         }}
                       >
-                        <img
-                          src={participant.profileData?.photoURL}
-                          alt={participant.profileData?.username}
-                          style={{
+                        {participant.profileData?.photoURL && participant.profileData.photoURL.length <= 2 ? (
+                          <div style={{
                             width: "64px",
                             height: "64px",
                             borderRadius: "16px",
                             border: "3px solid rgba(147, 51, 234, 0.5)",
                             boxShadow: "0 4px 15px rgba(147, 51, 234, 0.3)",
-                          }}
-                        />
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "36px",
+                            background: "linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(126, 34, 206, 0.2) 100%)"
+                          }}>
+                            {participant.profileData.photoURL}
+                          </div>
+                        ) : (
+                          <img
+                            src={participant.profileData?.photoURL || 'https://ui-avatars.com/api/?name=' + (participant.profileData?.username || 'User')}
+                            alt={participant.profileData?.username}
+                            style={{
+                              width: "64px",
+                              height: "64px",
+                              borderRadius: "16px",
+                              border: "3px solid rgba(147, 51, 234, 0.5)",
+                              boxShadow: "0 4px 15px rgba(147, 51, 234, 0.3)",
+                            }}
+                          />
+                        )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{

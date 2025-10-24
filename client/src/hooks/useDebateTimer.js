@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { switchTurn } from '../services/debateStateService';
+import { switchTurn, updateTimeRemaining } from '../services/debateStateService';
 
 /**
  * Custom hook for managing debate turn timer countdown
@@ -10,12 +10,18 @@ import { switchTurn } from '../services/debateStateService';
 export const useDebateTimer = (debateId, debateState) => {
   const [timeRemaining, setTimeRemaining] = useState(60);
   const timerIntervalRef = useRef(null);
+  const lastSyncRef = useRef(null);
 
-  // Update timeRemaining when debate state changes (new turn or debate starts)
+  // Update timeRemaining when debate state changes (new turn, debate starts, or initial load)
   useEffect(() => {
-    if (debateState && debateState.timeRemaining &&
-        debateState.timeRemaining !== timeRemaining) {
-      setTimeRemaining(debateState.timeRemaining);
+    if (debateState && debateState.timeRemaining !== undefined) {
+      // Only sync if it's a significant change (e.g., turn switch or fresh load)
+      // This prevents fighting with local countdown
+      const diff = Math.abs(debateState.timeRemaining - timeRemaining);
+      if (diff > 2 || timeRemaining === 60) {
+        setTimeRemaining(debateState.timeRemaining);
+        lastSyncRef.current = debateState.timeRemaining;
+      }
     }
   }, [debateState?.turnNumber, debateState?.debateStarted]);
 
@@ -36,9 +42,15 @@ export const useDebateTimer = (debateId, debateState) => {
 
     // Only start timer if not already running
     if (!timerIntervalRef.current) {
-      timerIntervalRef.current = setInterval(() => {
+      timerIntervalRef.current = setInterval(async () => {
         setTimeRemaining((prev) => {
           const newTime = prev - 1;
+
+          // Update database every 5 seconds to keep it in sync
+          if (newTime % 5 === 0 && newTime > 0) {
+            updateTimeRemaining(debateId, newTime);
+          }
+
           if (newTime <= 0) {
             switchTurn(debateId, debateState);
             return debateState.turnTime;

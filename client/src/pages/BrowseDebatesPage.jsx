@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { subscribeToDebates } from '../services/debateService';
+import { ref, onValue } from 'firebase/database';
+import { rtdb } from '../services/firebase';
 
 const BrowseDebatesPage = () => {
   const [debates, setDebates] = useState([]);
@@ -8,6 +10,7 @@ const BrowseDebatesPage = () => {
   const [error, setError] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('');
+  const [viewerCounts, setViewerCounts] = useState({}); // Track viewer counts for all debates
 
   const categories = [
     'all',
@@ -52,6 +55,33 @@ const BrowseDebatesPage = () => {
       setLoading(false);
     }
   }, [categoryFilter, statusFilter]);
+
+  // Subscribe to viewer counts for all debates
+  useEffect(() => {
+    if (debates.length === 0) return;
+
+    const unsubscribes = [];
+
+    debates.forEach(debate => {
+      const viewersRef = ref(rtdb, `activeViewers/${debate.id}`);
+
+      const unsubscribe = onValue(viewersRef, (snapshot) => {
+        const viewers = snapshot.val();
+        const count = viewers ? Object.keys(viewers).length : 0;
+
+        setViewerCounts(prev => ({
+          ...prev,
+          [debate.id]: count
+        }));
+      });
+
+      unsubscribes.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [debates]);
 
   // Format timestamp with full date/time for older debates
   const formatTimestamp = (timestamp) => {
@@ -374,7 +404,7 @@ const BrowseDebatesPage = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '24px' }}>👁️</span>
                     <span style={{ fontWeight: '600', color: '#e2e8f0' }}>
-                      {debate.stats?.currentViewers || 0} watching
+                      {viewerCounts[debate.id] || 0} watching
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

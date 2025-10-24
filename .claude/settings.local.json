@@ -31,7 +31,10 @@
       "Bash(npm test:*)",
       "Bash(rm:*)",
       "Bash(npm run test:e2e:*)",
-      "WebFetch(domain:ibb.co)"
+      "WebFetch(domain:ibb.co)",
+      "Bash(git checkout:*)",
+      "Bash(timeout:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

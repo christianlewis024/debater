@@ -10,10 +10,19 @@ const ProfilePage = () => {
   const [displayName, setDisplayName] = useState(userProfile?.username || '');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Available emoji profile pictures
+  const availableEmojis = [
+    '😀', '😎', '🤓', '😇', '🥳',
+    '🤠', '👽', '🤖', '👾', '🦄',
+    '🐶', '🐱', '🐼', '🦊', '🐯',
+    '🦁', '🐸', '🐵', '🦉', '🦅'
+  ];
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    
+
     if (!displayName.trim()) {
       setMessage({ type: 'error', text: 'Display name cannot be empty' });
       return;
@@ -41,6 +50,34 @@ const ProfilePage = () => {
     } catch (error) {
       console.error('Error updating profile:', error);
       setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmojiSelect = async (emoji) => {
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // Update Firebase Auth profile with emoji as photoURL
+      await updateProfile(currentUser, {
+        photoURL: emoji
+      });
+
+      // Update Firestore user document
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        photoURL: emoji
+      });
+
+      // Refresh user profile to show changes immediately
+      await refreshUserProfile();
+
+      setMessage({ type: 'success', text: 'Profile picture updated!' });
+      setShowEmojiPicker(false);
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      setMessage({ type: 'error', text: 'Failed to update profile picture.' });
     } finally {
       setLoading(false);
     }
@@ -110,18 +147,157 @@ const ProfilePage = () => {
         }}>
           {/* Avatar Section */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <img
-              src={currentUser.photoURL || 'https://ui-avatars.com/api/?name=' + (userProfile?.username || 'User')}
-              alt="Profile"
-              style={{
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                border: '4px solid rgba(59, 130, 246, 0.5)',
-                marginBottom: '20px',
-                boxShadow: '0 8px 30px rgba(59, 130, 246, 0.3)'
-              }}
-            />
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              {/* Check if photoURL is an emoji (single character) or image URL */}
+              {currentUser.photoURL && currentUser.photoURL.length <= 2 ? (
+                <div style={{
+                  width: '120px',
+                  height: '120px',
+                  borderRadius: '50%',
+                  border: '4px solid rgba(59, 130, 246, 0.5)',
+                  marginBottom: '20px',
+                  boxShadow: '0 8px 30px rgba(59, 130, 246, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '64px',
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)'
+                }}>
+                  {currentUser.photoURL}
+                </div>
+              ) : (
+                <img
+                  src={currentUser.photoURL || 'https://ui-avatars.com/api/?name=' + (userProfile?.username || 'User')}
+                  alt="Profile"
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '50%',
+                    border: '4px solid rgba(59, 130, 246, 0.5)',
+                    marginBottom: '20px',
+                    boxShadow: '0 8px 30px rgba(59, 130, 246, 0.3)'
+                  }}
+                />
+              )}
+
+              {/* Change Picture Button */}
+              <button
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                disabled={loading}
+                style={{
+                  position: 'absolute',
+                  bottom: '20px',
+                  right: '0',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  border: '3px solid rgba(17, 24, 39, 0.9)',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.target.style.transform = 'scale(1.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'scale(1)';
+                }}
+              >
+                📷
+              </button>
+            </div>
+
+            {/* Emoji Picker Modal */}
+            {showEmojiPicker && (
+              <div style={{
+                marginTop: '20px',
+                padding: '24px',
+                background: 'rgba(31, 41, 55, 0.95)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+              }}>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: '#fff',
+                  marginBottom: '16px',
+                  textAlign: 'center'
+                }}>
+                  Choose Your Avatar
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: '12px',
+                  marginBottom: '16px'
+                }}>
+                  {availableEmojis.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => handleEmojiSelect(emoji)}
+                      disabled={loading}
+                      style={{
+                        width: '56px',
+                        height: '56px',
+                        fontSize: '32px',
+                        borderRadius: '12px',
+                        border: currentUser.photoURL === emoji
+                          ? '3px solid #3b82f6'
+                          : '2px solid rgba(255, 255, 255, 0.1)',
+                        background: currentUser.photoURL === emoji
+                          ? 'rgba(59, 130, 246, 0.2)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!loading && currentUser.photoURL !== emoji) {
+                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.target.style.transform = 'scale(1.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentUser.photoURL !== emoji) {
+                          e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                        }
+                        e.target.style.transform = 'scale(1)';
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setShowEmojiPicker(false)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: '#94a3b8',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    fontFamily: "'Inter', sans-serif"
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
             <h2 style={{
               fontSize: '28px',
               fontWeight: '800',

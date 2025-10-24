@@ -268,6 +268,7 @@ const DebatePage = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* Video */}
             <VideoDebateRoom
+              key={debateId} // Force unmount/remount when debateId changes
               debateId={debateId}
               participants={participants}
               currentUser={currentUser}
@@ -275,8 +276,51 @@ const DebatePage = () => {
               debate={debate}
             />
 
+            {/* Join Button - Moved Higher */}
+            {debate.status === 'waiting' && currentUser && !isParticipant && (!debaterA || !debaterB || (!moderator && debate?.structure !== 'self-moderated')) && (
+              <div style={{
+                background: 'rgba(17, 24, 39, 0.6)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                padding: '32px',
+                textAlign: 'center',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+              }}>
+                <h3 style={{
+                  fontSize: '22px',
+                  fontWeight: '700',
+                  color: '#fff',
+                  marginBottom: '16px',
+                  letterSpacing: '-0.02em'
+                }}>
+                  🎯 Join This Debate
+                </h3>
+                <p style={{ color: '#94a3b8', marginBottom: '24px', fontSize: '15px', fontWeight: '500' }}>
+                  {!debaterA || !debaterB ? 'Debater slots available' : 'Moderator slot available'}
+                </p>
+                <button
+                  onClick={() => setShowJoinModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: '#fff',
+                    padding: '16px 48px',
+                    borderRadius: '14px',
+                    fontWeight: '700',
+                    fontSize: '17px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 30px rgba(59, 130, 246, 0.4)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {(!debaterA || !debaterB) ? 'Join as Debater' : 'Join as Moderator'}
+                </button>
+              </div>
+            )}
+
             {/* Waiting State */}
-            {debate.status === 'waiting' && (!debaterA || !debaterB || !moderator) && (
+            {debate.status === 'waiting' && (!debaterA || !debaterB || (!moderator && debate?.structure !== 'self-moderated')) && (
               <div style={{
                 background: 'rgba(17, 24, 39, 0.6)',
                 backdropFilter: 'blur(20px)',
@@ -299,53 +343,9 @@ const DebatePage = () => {
                 <p style={{ color: '#94a3b8', marginBottom: '32px', fontSize: '16px', fontWeight: '500' }}>
                   {!debaterA && !debaterB ? 'Need 2 debaters to start' :
                    (!debaterA || !debaterB) ? 'Need 1 more debater' :
-                   'Moderator needed to oversee the debate'}
+                   (debate?.structure === 'self-moderated' ? 'Waiting to start...' : 'Moderator needed to oversee the debate')}
                 </p>
-                {currentUser && !isParticipant ? (
-                  <button
-                    onClick={() => setShowJoinModal(true)}
-                    disabled={debaterA && debaterB && moderator}
-                    style={{
-                      background: (debaterA && debaterB && moderator)
-                        ? 'rgba(100, 116, 139, 0.3)'
-                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      color: '#fff',
-                      padding: '16px 48px',
-                      borderRadius: '14px',
-                      fontWeight: '700',
-                      fontSize: '17px',
-                      border: 'none',
-                      cursor: (debaterA && debaterB && moderator) ? 'not-allowed' : 'pointer',
-                      boxShadow: (debaterA && debaterB && moderator)
-                        ? 'none'
-                        : '0 8px 30px rgba(59, 130, 246, 0.4)',
-                      opacity: (debaterA && debaterB && moderator) ? 0.5 : 1,
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    {(!debaterA || !debaterB) ? 'Join as Debater' :
-                     !moderator ? 'Join as Moderator' :
-                     'All Slots Filled'}
-                  </button>
-                ) : !currentUser ? (
-                  <button
-                    onClick={() => navigate('/login')}
-                    style={{
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      color: '#fff',
-                      padding: '16px 48px',
-                      borderRadius: '14px',
-                      fontWeight: '700',
-                      fontSize: '17px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 8px 30px rgba(59, 130, 246, 0.4)',
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    Login to Join
-                  </button>
-                ) : (
+                {isParticipant && (
                   <p style={{ color: '#10b981', fontSize: '16px', fontWeight: '600' }}>
                     ✓ You've joined this Klash
                   </p>
@@ -478,8 +478,9 @@ const DebatePage = () => {
               >
                 {!debaterA && <option value="debater_a">Debater A (Pro)</option>}
                 {!debaterB && <option value="debater_b">Debater B (Con)</option>}
-                {!moderator && <option value="moderator">Moderator</option>}
-                {debaterA && debaterB && moderator && (
+                {/* Only show moderator option for non-self-moderated debates */}
+                {!moderator && debate?.structure !== 'self-moderated' && <option value="moderator">Moderator</option>}
+                {debaterA && debaterB && (debate?.structure === 'self-moderated' || moderator) && (
                   <option value="" disabled>All slots filled</option>
                 )}
               </select>

@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const Header = () => {
@@ -8,6 +7,8 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await logOut();
+      // Force a full page refresh after logout to cleanup camera/mic
+      window.location.href = '/';
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -27,7 +28,7 @@ const Header = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Logo and Title */}
-          <Link to="/" style={{
+          <a href="/" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
@@ -45,15 +46,15 @@ const Header = () => {
             }}>
               KLASH
             </div>
-          </Link>
+          </a>
 
           {/* Navigation */}
           <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <Link 
-              to="/" 
-              style={{ 
-                color: '#e2e8f0', 
-                textDecoration: 'none', 
+            <a
+              href="/"
+              style={{
+                color: '#e2e8f0',
+                textDecoration: 'none',
                 fontWeight: '600',
                 fontSize: '15px',
                 transition: 'color 0.2s ease'
@@ -62,10 +63,10 @@ const Header = () => {
               onMouseLeave={(e) => e.target.style.color = '#e2e8f0'}
             >
               Home
-            </Link>
-            
-            <Link
-              to="/browse"
+            </a>
+
+            <a
+              href="/browse"
               style={{
                 color: '#e2e8f0',
                 textDecoration: 'none',
@@ -77,12 +78,12 @@ const Header = () => {
               onMouseLeave={(e) => e.target.style.color = '#e2e8f0'}
             >
               Browse
-            </Link>
+            </a>
 
             {currentUser ? (
               <>
-                <Link
-                  to="/create"
+                <a
+                  href="/create"
                   style={{
                     color: '#e2e8f0',
                     textDecoration: 'none',
@@ -94,12 +95,12 @@ const Header = () => {
                   onMouseLeave={(e) => e.target.style.color = '#e2e8f0'}
                 >
                   Create
-                </Link>
-                <Link 
-                  to="/profile" 
-                  style={{ 
-                    color: '#e2e8f0', 
-                    textDecoration: 'none', 
+                </a>
+                <a
+                  href="/profile"
+                  style={{
+                    color: '#e2e8f0',
+                    textDecoration: 'none',
                     fontWeight: '600',
                     fontSize: '15px',
                     transition: 'color 0.2s ease'
@@ -108,22 +109,40 @@ const Header = () => {
                   onMouseLeave={(e) => e.target.style.color = '#e2e8f0'}
                 >
                   Profile
-                </Link>
+                </a>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <img
-                      src={userProfile?.photoURL || 'https://ui-avatars.com/api/?name=' + (userProfile?.username || 'User')}
-                      alt="Profile"
-                      style={{ 
-                        width: '40px', 
-                        height: '40px', 
+                    {/* Check if photoURL is an emoji (single character) or image URL */}
+                    {userProfile?.photoURL && userProfile.photoURL.length <= 2 ? (
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
                         borderRadius: '50%',
                         border: '2px solid rgba(59, 130, 246, 0.5)',
-                        boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
-                      }}
-                    />
-                    <span style={{ 
-                      fontWeight: '600', 
+                        boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px',
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)'
+                      }}>
+                        {userProfile.photoURL}
+                      </div>
+                    ) : (
+                      <img
+                        src={userProfile?.photoURL || 'https://ui-avatars.com/api/?name=' + (userProfile?.username || 'User')}
+                        alt="Profile"
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          border: '2px solid rgba(59, 130, 246, 0.5)',
+                          boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                        }}
+                      />
+                    )}
+                    <span style={{
+                      fontWeight: '600',
                       color: '#fff',
                       fontSize: '15px'
                     }}>
@@ -157,8 +176,8 @@ const Header = () => {
               </>
             ) : (
               <>
-                <Link
-                  to="/login"
+                <a
+                  href="/login"
                   style={{
                     background: 'rgba(255, 255, 255, 0.1)',
                     color: '#fff',
@@ -179,9 +198,9 @@ const Header = () => {
                   }}
                 >
                   Login
-                </Link>
-                <Link
-                  to="/signup"
+                </a>
+                <a
+                  href="/signup"
                   style={{
                     background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                     color: '#fff',
@@ -205,7 +224,7 @@ const Header = () => {
                   }}
                 >
                   Sign Up
-                </Link>
+                </a>
               </>
             )}
           </nav>

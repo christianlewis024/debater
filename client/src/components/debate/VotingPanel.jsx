@@ -244,21 +244,39 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
             )}
 
             <div style={{ textAlign: "center" }}>
-              <img
-                src={
-                  debaterA.profileData?.photoURL ||
-                  "https://ui-avatars.com/api/?name=User"
-                }
-                alt={debaterA.profileData?.username}
-                style={{
+              {debaterA.profileData?.photoURL && debaterA.profileData.photoURL.length <= 2 ? (
+                <div style={{
                   width: "60px",
                   height: "60px",
                   borderRadius: "50%",
                   border: "3px solid rgba(59, 130, 246, 0.5)",
                   marginBottom: "12px",
                   boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)",
-                }}
-              />
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "32px",
+                  background: "linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)"
+                }}>
+                  {debaterA.profileData.photoURL}
+                </div>
+              ) : (
+                <img
+                  src={
+                    debaterA.profileData?.photoURL ||
+                    "https://ui-avatars.com/api/?name=User"
+                  }
+                  alt={debaterA.profileData?.username}
+                  style={{
+                    width: "60px",
+                    height: "60px",
+                    borderRadius: "50%",
+                    border: "3px solid rgba(59, 130, 246, 0.5)",
+                    marginBottom: "12px",
+                    boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)",
+                  }}
+                />
+              )}
               <div
                 style={{
                   fontWeight: "700",
@@ -361,21 +379,39 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
             )}
 
             <div style={{ textAlign: "center" }}>
-              <img
-                src={
-                  debaterB.profileData?.photoURL ||
-                  "https://ui-avatars.com/api/?name=User"
-                }
-                alt={debaterB.profileData?.username}
-                style={{
+              {debaterB.profileData?.photoURL && debaterB.profileData.photoURL.length <= 2 ? (
+                <div style={{
                   width: "60px",
                   height: "60px",
                   borderRadius: "50%",
                   border: "3px solid rgba(239, 68, 68, 0.5)",
                   marginBottom: "12px",
                   boxShadow: "0 4px 15px rgba(239, 68, 68, 0.3)",
-                }}
-              />
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "32px",
+                  background: "linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%)"
+                }}>
+                  {debaterB.profileData.photoURL}
+                </div>
+              ) : (
+                <img
+                  src={
+                    debaterB.profileData?.photoURL ||
+                    "https://ui-avatars.com/api/?name=User"
+                  }
+                  alt={debaterB.profileData?.username}
+                  style={{
+                    width: "60px",
+                    height: "60px",
+                    borderRadius: "50%",
+                    border: "3px solid rgba(239, 68, 68, 0.5)",
+                    marginBottom: "12px",
+                    boxShadow: "0 4px 15px rgba(239, 68, 68, 0.3)",
+                  }}
+                />
+              )}
               <div
                 style={{
                   fontWeight: "700",
