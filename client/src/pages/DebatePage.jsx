@@ -151,7 +151,25 @@ const DebatePage = () => {
       return;
     }
 
+    if (!currentUser) {
+      alert('You must be logged in to join the waitlist');
+      return;
+    }
+
+    if (!userProfile) {
+      alert('Loading user profile... please try again in a moment');
+      return;
+    }
+
     try {
+      console.log('Joining waitlist with:', {
+        debateId,
+        userId: currentUser.uid,
+        username: userProfile.username,
+        photoURL: userProfile.photoURL,
+        stance: waitlistStance
+      });
+
       await joinWaitlist(
         debateId,
         currentUser.uid,
@@ -159,11 +177,17 @@ const DebatePage = () => {
         userProfile.photoURL,
         waitlistStance
       );
+
+      console.log('Successfully joined waitlist');
       setWaitlistStance('');
       setShowWaitlistModal(false);
+
+      // Refresh the page to update video/audio state
+      window.location.reload();
     } catch (error) {
       console.error('Error joining waitlist:', error);
-      alert('Failed to join waitlist. Please try again.');
+      console.error('Error details:', error.message, error.code);
+      alert(`Failed to join waitlist: ${error.message || 'Please try again.'}`);
     }
   };
 

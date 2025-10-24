@@ -34,7 +34,8 @@
       "WebFetch(domain:ibb.co)",
       "Bash(git checkout:*)",
       "Bash(timeout:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(npm run deploy:rules:*)"
     ],
     "deny": [],
     "ask": []
