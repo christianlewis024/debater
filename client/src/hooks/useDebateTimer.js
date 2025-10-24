@@ -12,18 +12,19 @@ export const useDebateTimer = (debateId, debateState) => {
   const timerIntervalRef = useRef(null);
   const lastSyncRef = useRef(null);
 
-  // Update timeRemaining when debate state changes (new turn, debate starts, or initial load)
+  // Update timeRemaining when debate state changes (new turn, debate starts, or time added)
   useEffect(() => {
     if (debateState && debateState.timeRemaining !== undefined) {
-      // Only sync if it's a significant change (e.g., turn switch or fresh load)
+      // Only sync if it's a significant change (e.g., turn switch, time added, or fresh load)
       // This prevents fighting with local countdown
       const diff = Math.abs(debateState.timeRemaining - timeRemaining);
       if (diff > 2 || timeRemaining === 60) {
+        console.log('⏱️ Syncing timer from database:', debateState.timeRemaining, 'diff:', diff);
         setTimeRemaining(debateState.timeRemaining);
         lastSyncRef.current = debateState.timeRemaining;
       }
     }
-  }, [debateState?.turnNumber, debateState?.debateStarted]);
+  }, [debateState?.turnNumber, debateState?.debateStarted, debateState?.timeRemaining]);
 
   // Timer countdown
   useEffect(() => {

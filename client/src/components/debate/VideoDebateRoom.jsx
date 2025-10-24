@@ -695,11 +695,12 @@ const VideoDebateRoom = ({
                 </button>
               )}
 
-            {/* Start button */}
+            {/* Start button - Only show to moderator, or host in self-moderated debates */}
             {debateState &&
               !debateState.debateStarted &&
               participants.debater_a &&
-              participants.debater_b && (
+              participants.debater_b &&
+              hasModeratorControls && (
                 <button
                   onClick={handleStartDebate}
                   style={{
@@ -719,8 +720,8 @@ const VideoDebateRoom = ({
                 </button>
               )}
 
-            {/* Reset button */}
-            {debateState && debateState.debateStarted && isDebater && (
+            {/* Reset button - Only show to moderator, or host in self-moderated debates */}
+            {debateState && debateState.debateStarted && hasModeratorControls && (
               <button
                 onClick={async () => {
                   const { updateDoc, doc } = await import("firebase/firestore");

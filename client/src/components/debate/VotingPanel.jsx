@@ -90,23 +90,23 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
         style={{
           background: "rgba(17, 24, 39, 0.6)",
           backdropFilter: "blur(20px)",
-          borderRadius: "20px",
+          borderRadius: "16px",
           border: "1px solid rgba(255, 255, 255, 0.08)",
-          padding: "24px",
+          padding: "16px",
           fontFamily: "'Inter', sans-serif",
         }}
       >
         <h3
           style={{
-            fontSize: "18px",
+            fontSize: "15px",
             fontWeight: "700",
-            marginBottom: "16px",
+            marginBottom: "12px",
             color: "#fff",
           }}
         >
           🗳️ Cast Your Vote
         </h3>
-        <p style={{ textAlign: "center", color: "#94a3b8", padding: "20px 0" }}>
+        <p style={{ textAlign: "center", color: "#94a3b8", padding: "16px 0", fontSize: "13px" }}>
           Waiting for debaters...
         </p>
       </div>
@@ -129,22 +129,22 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
       style={{
         background: "rgba(17, 24, 39, 0.6)",
         backdropFilter: "blur(20px)",
-        borderRadius: "20px",
+        borderRadius: "16px",
         border: "1px solid rgba(255, 255, 255, 0.08)",
-        padding: "24px",
+        padding: "16px",
         boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
         fontFamily: "'Inter', sans-serif",
       }}
     >
       <h3
         style={{
-          fontSize: "18px",
+          fontSize: "15px",
           fontWeight: "700",
-          marginBottom: "16px",
+          marginBottom: "12px",
           color: "#fff",
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: "6px",
         }}
       >
         🗳️ Cast Your Vote
@@ -187,7 +187,7 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
 
       {/* Voting Options - Side by Side */}
       <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}
       >
         {/* Debater A */}
         {debaterA && (
@@ -202,8 +202,8 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
               border: winningA
                 ? "2px solid rgba(59, 130, 246, 0.5)"
                 : "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "16px",
-              padding: "20px 16px",
+              borderRadius: "12px",
+              padding: "14px 10px",
               cursor:
                 !hasVoted && currentUser && !voting ? "pointer" : "default",
               transition: "all 0.3s ease",
@@ -246,16 +246,16 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
             <div style={{ textAlign: "center" }}>
               {debaterA.profileData?.photoURL && debaterA.profileData.photoURL.length <= 2 ? (
                 <div style={{
-                  width: "60px",
-                  height: "60px",
+                  width: "45px",
+                  height: "45px",
                   borderRadius: "50%",
-                  border: "3px solid rgba(59, 130, 246, 0.5)",
-                  marginBottom: "12px",
+                  border: "2px solid rgba(59, 130, 246, 0.5)",
+                  marginBottom: "8px",
                   boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "32px",
+                  fontSize: "24px",
                   background: "linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)"
                 }}>
                   {debaterA.profileData.photoURL}
@@ -268,11 +268,11 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
                   }
                   alt={debaterA.profileData?.username}
                   style={{
-                    width: "60px",
-                    height: "60px",
+                    width: "45px",
+                    height: "45px",
                     borderRadius: "50%",
-                    border: "3px solid rgba(59, 130, 246, 0.5)",
-                    marginBottom: "12px",
+                    border: "2px solid rgba(59, 130, 246, 0.5)",
+                    marginBottom: "8px",
                     boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)",
                   }}
                 />
@@ -281,17 +281,17 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
                 style={{
                   fontWeight: "700",
                   color: "#fff",
-                  fontSize: "15px",
-                  marginBottom: "4px",
+                  fontSize: "13px",
+                  marginBottom: "3px",
                 }}
               >
                 {debaterA.profileData?.username}
               </div>
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "11px",
                   color: "#94a3b8",
-                  marginBottom: "12px",
+                  marginBottom: "8px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -303,17 +303,17 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
               {/* Percentage */}
               <div
                 style={{
-                  fontSize: "32px",
+                  fontSize: "24px",
                   fontWeight: "900",
                   color: "#60a5fa",
-                  marginBottom: "4px",
+                  marginBottom: "2px",
                 }}
               >
                 {percentageA}%
               </div>
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "11px",
                   color: "#64748b",
                   fontWeight: "600",
                 }}
@@ -337,8 +337,8 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
               border: winningB
                 ? "2px solid rgba(239, 68, 68, 0.5)"
                 : "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "16px",
-              padding: "20px 16px",
+              borderRadius: "12px",
+              padding: "14px 10px",
               cursor:
                 !hasVoted && currentUser && !voting ? "pointer" : "default",
               transition: "all 0.3s ease",
@@ -381,16 +381,16 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
             <div style={{ textAlign: "center" }}>
               {debaterB.profileData?.photoURL && debaterB.profileData.photoURL.length <= 2 ? (
                 <div style={{
-                  width: "60px",
-                  height: "60px",
+                  width: "45px",
+                  height: "45px",
                   borderRadius: "50%",
-                  border: "3px solid rgba(239, 68, 68, 0.5)",
-                  marginBottom: "12px",
+                  border: "2px solid rgba(239, 68, 68, 0.5)",
+                  marginBottom: "8px",
                   boxShadow: "0 4px 15px rgba(239, 68, 68, 0.3)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "32px",
+                  fontSize: "24px",
                   background: "linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%)"
                 }}>
                   {debaterB.profileData.photoURL}
@@ -403,11 +403,11 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
                   }
                   alt={debaterB.profileData?.username}
                   style={{
-                    width: "60px",
-                    height: "60px",
+                    width: "45px",
+                    height: "45px",
                     borderRadius: "50%",
-                    border: "3px solid rgba(239, 68, 68, 0.5)",
-                    marginBottom: "12px",
+                    border: "2px solid rgba(239, 68, 68, 0.5)",
+                    marginBottom: "8px",
                     boxShadow: "0 4px 15px rgba(239, 68, 68, 0.3)",
                   }}
                 />
@@ -416,17 +416,17 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
                 style={{
                   fontWeight: "700",
                   color: "#fff",
-                  fontSize: "15px",
-                  marginBottom: "4px",
+                  fontSize: "13px",
+                  marginBottom: "3px",
                 }}
               >
                 {debaterB.profileData?.username}
               </div>
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "11px",
                   color: "#94a3b8",
-                  marginBottom: "12px",
+                  marginBottom: "8px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -438,17 +438,17 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
               {/* Percentage */}
               <div
                 style={{
-                  fontSize: "32px",
+                  fontSize: "24px",
                   fontWeight: "900",
                   color: "#f87171",
-                  marginBottom: "4px",
+                  marginBottom: "2px",
                 }}
               >
                 {percentageB}%
               </div>
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "11px",
                   color: "#64748b",
                   fontWeight: "600",
                 }}
@@ -463,12 +463,12 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
       {/* Total Votes */}
       <div
         style={{
-          marginTop: "16px",
-          paddingTop: "16px",
+          marginTop: "12px",
+          paddingTop: "12px",
           borderTop: "1px solid rgba(255, 255, 255, 0.08)",
           textAlign: "center",
           color: "#94a3b8",
-          fontSize: "13px",
+          fontSize: "12px",
           fontWeight: "600",
         }}
       >

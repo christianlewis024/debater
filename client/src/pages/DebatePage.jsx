@@ -5,6 +5,7 @@ import { subscribeToDebate, joinDebate } from '../services/debateService';
 import { subscribeToParticipants, joinAsViewer, subscribeToViewerCount } from '../services/chatService';
 import { subscribeToDebateState } from '../services/debateStateService';
 import { handleDebateEnd, scheduleDebateDeletion } from '../services/debateEndService';
+import { subscribeToWaitlist, joinWaitlist, leaveWaitlist } from '../services/waitlistService';
 import ChatPanel from '../components/debate/ChatPanel';
 import VotingPanel from '../components/debate/VotingPanel';
 import VideoDebateRoom from '../components/debate/VideoDebateRoom';
@@ -23,6 +24,10 @@ const DebatePage = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinSide, setJoinSide] = useState('debater_a');
   const [sideDescription, setSideDescription] = useState('');
+  const [waitlist, setWaitlist] = useState([]);
+  const [isOnWaitlist, setIsOnWaitlist] = useState(false);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [waitlistStance, setWaitlistStance] = useState('');
 
   const debaterA = participants.debater_a;
   const debaterB = participants.debater_b;
@@ -83,6 +88,19 @@ const DebatePage = () => {
     };
   }, [debateId, currentUser]);
 
+  // Subscribe to waitlist for self-moderated debates
+  useEffect(() => {
+    if (!debateId || !debate || debate.structure !== 'self-moderated') return;
+
+    const unsubscribe = subscribeToWaitlist(debateId, (entries) => {
+      setWaitlist(entries);
+      const userInWaitlist = entries.find(entry => entry.userId === currentUser?.uid);
+      setIsOnWaitlist(!!userInWaitlist);
+    });
+
+    return () => unsubscribe();
+  }, [debateId, currentUser, debate]);
+
   // Handle debate end - count votes and schedule cleanup
   useEffect(() => {
     const handleEnd = async () => {
@@ -124,6 +142,37 @@ const DebatePage = () => {
     } catch (error) {
       console.error('Error joining debate:', error);
       setError('Failed to join debate');
+    }
+  };
+
+  const handleJoinWaitlist = async () => {
+    if (!waitlistStance.trim()) {
+      alert('Please enter your stance on the issue');
+      return;
+    }
+
+    try {
+      await joinWaitlist(
+        debateId,
+        currentUser.uid,
+        userProfile.username,
+        userProfile.photoURL,
+        waitlistStance
+      );
+      setWaitlistStance('');
+      setShowWaitlistModal(false);
+    } catch (error) {
+      console.error('Error joining waitlist:', error);
+      alert('Failed to join waitlist. Please try again.');
+    }
+  };
+
+  const handleLeaveWaitlist = async () => {
+    try {
+      await leaveWaitlist(debateId, currentUser.uid);
+    } catch (error) {
+      console.error('Error leaving waitlist:', error);
+      alert('Failed to leave waitlist. Please try again.');
     }
   };
 
@@ -189,83 +238,194 @@ const DebatePage = () => {
       }}></div>
 
       {/* Header */}
-      <div style={{ 
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
+      <div style={{
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         backdropFilter: 'blur(10px)',
         background: 'rgba(17, 24, 39, 0.5)',
         position: 'relative',
         zIndex: 10
       }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h1 style={{ 
-              fontSize: '36px', 
-              fontWeight: '800', 
-              color: '#fff',
-              background: 'linear-gradient(135deg, #fff 0%, #94a3b8 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.02em'
-            }}>
-              {debate.title}
-            </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                padding: '8px 16px',
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px 32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ flex: 1 }}>
+              <h1 style={{
+                fontSize: '24px',
+                fontWeight: '800',
+                color: '#fff',
+                background: 'linear-gradient(135deg, #fff 0%, #94a3b8 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.02em',
+                marginBottom: '8px'
+              }}>
+                {debate.title}
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: '#94a3b8' }}>
+                <span style={{ fontWeight: '500' }}>by <span style={{ color: '#e2e8f0' }}>{debate.hostUsername}</span></span>
+                <span style={{ opacity: 0.5 }}>•</span>
+                <span style={{
+                  padding: '3px 10px',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  borderRadius: '6px',
+                  color: '#60a5fa',
+                  fontWeight: '600',
+                  fontSize: '12px'
+                }}>
+                  {debate.category}
+                </span>
+                <span style={{ opacity: 0.5 }}>•</span>
+                <span style={{
+                  padding: '3px 10px',
+                  background: debate.structure === 'self-moderated'
+                    ? 'rgba(16, 185, 129, 0.15)'
+                    : debate.structure === 'auto-moderated'
+                    ? 'rgba(147, 51, 234, 0.15)'
+                    : 'rgba(251, 191, 36, 0.15)',
+                  borderRadius: '6px',
+                  color: debate.structure === 'self-moderated'
+                    ? '#10b981'
+                    : debate.structure === 'auto-moderated'
+                    ? '#a78bfa'
+                    : '#fbbf24',
+                  fontWeight: '600',
+                  fontSize: '12px'
+                }}>
+                  {debate.structure === 'self-moderated' ? '👥 Self-Moderated' :
+                   debate.structure === 'auto-moderated' ? '🤖 Auto-Moderated' :
+                   '👨‍⚖️ 3rd Party Moderator'}
+                </span>
+                <span style={{ opacity: 0.5 }}>•</span>
+                <span>{debate.settings?.turnTime}s per turn</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Waiting Status Message */}
+              {debate.status === 'waiting' && (!debaterA || !debaterB || (!moderator && debate?.structure !== 'self-moderated')) && (
+                <div style={{
+                  padding: '6px 14px',
+                  background: 'rgba(251, 191, 36, 0.15)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(251, 191, 36, 0.3)',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#fbbf24',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>⏳</span>
+                  {!debaterA && !debaterB ? 'Need 2 debaters' :
+                   (!debaterA || !debaterB) ? 'Need 1 more debater' :
+                   (debate?.structure === 'self-moderated' ? 'Waiting to start...' : 'Need moderator')}
+                </div>
+              )}
+
+              {/* Join Button in Header */}
+              {debate.status === 'waiting' && currentUser && !isParticipant && (!debaterA || !debaterB || (!moderator && debate?.structure !== 'self-moderated')) && (
+                <button
+                  onClick={() => setShowJoinModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: '#fff',
+                    padding: '10px 20px',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {(!debaterA || !debaterB) ? '🎯 Join Debate' : '🎯 Join as Moderator'}
+                </button>
+              )}
+
+              {/* Waitlist Button - For self-moderated debates only */}
+              {debate?.structure === 'self-moderated' && currentUser && !isParticipant && !debaterB && (
+                <>
+                  {!isOnWaitlist ? (
+                    <button
+                      onClick={() => setShowWaitlistModal(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#fff',
+                        padding: '10px 20px',
+                        borderRadius: '10px',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
+                        transition: 'all 0.3s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      ✋ Join Waitlist ({waitlist.length})
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleLeaveWaitlist}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.2)',
+                        color: '#ef4444',
+                        padding: '10px 20px',
+                        borderRadius: '10px',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      ❌ Leave Waitlist
+                    </button>
+                  )}
+                </>
+              )}
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
                 background: 'rgba(59, 130, 246, 0.1)',
-                borderRadius: '12px',
+                borderRadius: '10px',
                 border: '1px solid rgba(59, 130, 246, 0.2)'
               }}>
-                <span style={{ fontSize: '20px' }}>👁️</span>
-                <span style={{ color: '#60a5fa', fontWeight: '600', fontSize: '16px' }}>{viewerCount}</span>
+                <span style={{ fontSize: '16px' }}>👁️</span>
+                <span style={{ color: '#60a5fa', fontWeight: '600', fontSize: '14px' }}>{viewerCount}</span>
               </div>
               {debate.status === 'active' && (
                 <div style={{
-                  padding: '8px 20px',
+                  padding: '6px 16px',
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: '#fff',
-                  borderRadius: '12px',
-                  fontSize: '14px',
+                  borderRadius: '10px',
+                  fontSize: '12px',
                   fontWeight: '700',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
                   letterSpacing: '0.05em'
                 }}>
-                  <span style={{ width: '8px', height: '8px', background: '#fff', borderRadius: '50%', animation: 'pulse 2s infinite' }}></span>
+                  <span style={{ width: '6px', height: '6px', background: '#fff', borderRadius: '50%', animation: 'pulse 2s infinite' }}></span>
                   LIVE
                 </div>
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '15px', color: '#94a3b8' }}>
-            <span style={{ fontWeight: '500' }}>by <span style={{ color: '#e2e8f0' }}>{debate.hostUsername}</span></span>
-            <span style={{ opacity: 0.5 }}>•</span>
-            <span style={{ 
-              padding: '4px 12px', 
-              background: 'rgba(59, 130, 246, 0.15)',
-              borderRadius: '8px',
-              color: '#60a5fa',
-              fontWeight: '600',
-              fontSize: '13px'
-            }}>
-              {debate.category}
-            </span>
-            <span style={{ opacity: 0.5 }}>•</span>
-            <span>{debate.settings?.turnTime}s per turn</span>
-          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '32px', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '32px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 32px', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px' }}>
           {/* Main Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Video */}
             <VideoDebateRoom
               key={debateId} // Force unmount/remount when debateId changes
@@ -275,87 +435,10 @@ const DebatePage = () => {
               userProfile={userProfile}
               debate={debate}
             />
-
-            {/* Join Button - Moved Higher */}
-            {debate.status === 'waiting' && currentUser && !isParticipant && (!debaterA || !debaterB || (!moderator && debate?.structure !== 'self-moderated')) && (
-              <div style={{
-                background: 'rgba(17, 24, 39, 0.6)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                padding: '32px',
-                textAlign: 'center',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-              }}>
-                <h3 style={{
-                  fontSize: '22px',
-                  fontWeight: '700',
-                  color: '#fff',
-                  marginBottom: '16px',
-                  letterSpacing: '-0.02em'
-                }}>
-                  🎯 Join This Debate
-                </h3>
-                <p style={{ color: '#94a3b8', marginBottom: '24px', fontSize: '15px', fontWeight: '500' }}>
-                  {!debaterA || !debaterB ? 'Debater slots available' : 'Moderator slot available'}
-                </p>
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: '#fff',
-                    padding: '16px 48px',
-                    borderRadius: '14px',
-                    fontWeight: '700',
-                    fontSize: '17px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 8px 30px rgba(59, 130, 246, 0.4)',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {(!debaterA || !debaterB) ? 'Join as Debater' : 'Join as Moderator'}
-                </button>
-              </div>
-            )}
-
-            {/* Waiting State */}
-            {debate.status === 'waiting' && (!debaterA || !debaterB || (!moderator && debate?.structure !== 'self-moderated')) && (
-              <div style={{
-                background: 'rgba(17, 24, 39, 0.6)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                padding: '48px',
-                textAlign: 'center',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-              }}>
-                <div style={{ fontSize: '80px', marginBottom: '24px' }}>⏳</div>
-                <h2 style={{
-                  fontSize: '28px',
-                  fontWeight: '800',
-                  color: '#fff',
-                  marginBottom: '12px',
-                  letterSpacing: '-0.02em'
-                }}>
-                  {(!debaterA || !debaterB) ? 'Waiting for Debaters' : 'Waiting for Moderator'}
-                </h2>
-                <p style={{ color: '#94a3b8', marginBottom: '32px', fontSize: '16px', fontWeight: '500' }}>
-                  {!debaterA && !debaterB ? 'Need 2 debaters to start' :
-                   (!debaterA || !debaterB) ? 'Need 1 more debater' :
-                   (debate?.structure === 'self-moderated' ? 'Waiting to start...' : 'Moderator needed to oversee the debate')}
-                </p>
-                {isParticipant && (
-                  <p style={{ color: '#10b981', fontSize: '16px', fontWeight: '600' }}>
-                    ✓ You've joined this Klash
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Voting */}
             <VotingPanel
               debateId={debateId}
@@ -371,28 +454,27 @@ const DebatePage = () => {
             />
 
             {/* Actions */}
-            <div style={{ 
-              background: 'rgba(17, 24, 39, 0.6)', 
+            <div style={{
+              background: 'rgba(17, 24, 39, 0.6)',
               backdropFilter: 'blur(20px)',
-              borderRadius: '20px', 
-              border: '1px solid rgba(255, 255, 255, 0.08)', 
-              padding: '20px',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '14px',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
             }}>
               <button
                 onClick={() => navigate('/browse')}
                 style={{
                   width: '100%',
-                  padding: '14px 20px',
+                  padding: '12px 16px',
                   background: 'rgba(59, 130, 246, 0.1)',
                   color: '#60a5fa',
-                  borderRadius: '12px',
+                  borderRadius: '10px',
                   fontWeight: '600',
-                  fontSize: '15px',
+                  fontSize: '14px',
                   border: '1px solid rgba(59, 130, 246, 0.2)',
                   cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  marginBottom: '12px'
+                  transition: 'all 0.3s ease'
                 }}
               >
                 ← Back to Browse
@@ -559,6 +641,124 @@ const DebatePage = () => {
                 }}
               >
                 Join
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waitlist Modal */}
+      {showWaitlistModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 100
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '24px',
+            maxWidth: '500px',
+            width: '100%',
+            padding: '32px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+          }}>
+            <h2 style={{
+              fontSize: '28px',
+              fontWeight: '800',
+              marginBottom: '28px',
+              color: '#fff',
+              letterSpacing: '-0.02em'
+            }}>
+              Join Waitlist
+            </h2>
+
+            <div style={{ marginBottom: '28px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#e2e8f0',
+                marginBottom: '10px',
+                letterSpacing: '0.02em'
+              }}>
+                Your CON stance (brief sentence):
+              </label>
+              <textarea
+                value={waitlistStance}
+                onChange={(e) => setWaitlistStance(e.target.value)}
+                placeholder="e.g., I believe the opposite because..."
+                maxLength={150}
+                style={{
+                  width: '100%',
+                  padding: '14px 18px',
+                  background: 'rgba(31, 41, 55, 0.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  color: '#fff',
+                  fontSize: '15px',
+                  fontWeight: '500',
+                  fontFamily: "'Inter', sans-serif",
+                  resize: 'vertical',
+                  minHeight: '100px'
+                }}
+              />
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px' }}>
+                {waitlistStance.length}/150 characters
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => {
+                  setShowWaitlistModal(false);
+                  setWaitlistStance('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '14px 24px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: '#e2e8f0',
+                  borderRadius: '12px',
+                  fontWeight: '600',
+                  fontSize: '15px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleJoinWaitlist}
+                disabled={!waitlistStance.trim()}
+                style={{
+                  flex: 1,
+                  padding: '14px 24px',
+                  background: waitlistStance.trim()
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : 'rgba(100, 116, 139, 0.3)',
+                  color: '#fff',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '15px',
+                  border: 'none',
+                  cursor: waitlistStance.trim() ? 'pointer' : 'not-allowed',
+                  boxShadow: waitlistStance.trim()
+                    ? '0 4px 15px rgba(16, 185, 129, 0.4)'
+                    : 'none',
+                  opacity: waitlistStance.trim() ? 1 : 0.5,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Join Waitlist
               </button>
             </div>
           </div>
