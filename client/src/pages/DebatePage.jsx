@@ -611,9 +611,9 @@ const DebatePage = () => {
         <div style={{
           position: 'fixed',
           left: '10px',
-          top: '140px',
+          top: '200px',
           width: `${leftSidebarWidth}%`,
-          maxHeight: 'calc(100vh - 160px)',
+          maxHeight: 'calc(100vh - 220px)',
           overflowY: 'auto',
           zIndex: 999
         }}
@@ -793,7 +793,7 @@ const DebatePage = () => {
           style={{
             position: 'fixed',
             left: '10px',
-            top: '140px',
+            top: '200px',
             background: 'rgba(17, 24, 39, 0.6)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
