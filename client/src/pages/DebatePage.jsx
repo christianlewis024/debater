@@ -32,6 +32,62 @@ const DebatePage = () => {
   const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   const [waitlistStance, setWaitlistStance] = useState('');
   const [trendingDebates, setTrendingDebates] = useState([]);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
+
+  // Sidebar resize state - load from localStorage or use defaults
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('leftSidebarWidth');
+    return saved ? parseFloat(saved) : 15;
+  });
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('rightSidebarWidth');
+    return saved ? parseFloat(saved) : 25;
+  });
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
+
+  // Handle resize mouse events
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isResizingLeft) {
+        const newWidth = (e.clientX / window.innerWidth) * 100;
+        if (newWidth >= 10 && newWidth <= 30) {
+          setLeftSidebarWidth(newWidth);
+        }
+      }
+      if (isResizingRight) {
+        const newWidth = ((window.innerWidth - e.clientX) / window.innerWidth) * 100;
+        if (newWidth >= 15 && newWidth <= 40) {
+          setRightSidebarWidth(newWidth);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingLeft) {
+        localStorage.setItem('leftSidebarWidth', leftSidebarWidth.toString());
+        setIsResizingLeft(false);
+      }
+      if (isResizingRight) {
+        localStorage.setItem('rightSidebarWidth', rightSidebarWidth.toString());
+        setIsResizingRight(false);
+      }
+    };
+
+    if (isResizingLeft || isResizingRight) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingLeft, isResizingRight, leftSidebarWidth, rightSidebarWidth]);
 
   // Add pulse animation CSS for Join button and scrollbar styling
   useEffect(() => {
@@ -551,33 +607,75 @@ const DebatePage = () => {
       </div>
 
       {/* Trending Debates Sidebar - Fixed to left edge */}
-      <div style={{
-        position: 'fixed',
-        left: '20px',
-        top: '90px',
-        width: '260px',
-        background: 'rgba(17, 24, 39, 0.6)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        padding: '20px',
-        maxHeight: 'calc(100vh - 110px)',
-        overflowY: 'auto',
-        zIndex: 100
-      }}
-      className="trending-sidebar"
-      >
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '700',
-              color: '#fff',
-              marginBottom: '16px',
+      {!isSidebarMinimized ? (
+        <div style={{
+          position: 'fixed',
+          left: '10px',
+          top: '140px',
+          width: `${leftSidebarWidth}%`,
+          maxHeight: 'calc(100vh - 160px)',
+          overflowY: 'auto',
+          zIndex: 999
+        }}
+        className="trending-sidebar"
+        >
+          <div style={{
+            background: 'rgba(17, 24, 39, 0.6)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '20px',
+            position: 'relative'
+          }}>
+            {/* Resize handle for left sidebar */}
+            <div
+              onMouseDown={() => setIsResizingLeft(true)}
+              style={{
+                position: 'absolute',
+                right: '-4px',
+                top: 0,
+                bottom: 0,
+                width: '8px',
+                cursor: 'ew-resize',
+                background: 'transparent',
+                zIndex: 1000
+              }}
+              title="Drag to resize"
+            />
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              justifyContent: 'space-between',
+              marginBottom: '16px'
             }}>
-              🔥 Trending
-            </h3>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: '700',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: 0
+              }}>
+                🔥 Trending
+              </h3>
+              <button
+                onClick={() => setIsSidebarMinimized(true)}
+                style={{
+                  background: 'rgba(100, 116, 139, 0.2)',
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Minimize sidebar"
+              >
+                ←
+              </button>
+            </div>
 
             {trendingDebates.length === 0 ? (
               <p style={{ color: '#64748b', fontSize: '13px', fontStyle: 'italic' }}>
@@ -687,69 +785,95 @@ const DebatePage = () => {
                 })}
               </div>
             )}
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsSidebarMinimized(false)}
+          style={{
+            position: 'fixed',
+            left: '10px',
+            top: '140px',
+            background: 'rgba(17, 24, 39, 0.6)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '8px',
+            padding: '12px 8px',
+            color: '#94a3b8',
+            cursor: 'pointer',
+            fontSize: '14px',
+            zIndex: 999,
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="Show trending debates"
+        >
+          →
+        </button>
+      )}
+
+      {/* Right Sidebar - Fixed to right edge */}
+      <div style={{
+        position: 'fixed',
+        right: '10px',
+        top: '140px',
+        width: `${rightSidebarWidth}%`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        maxHeight: 'calc(100vh - 160px)',
+        overflowY: 'auto',
+        zIndex: 999
+      }}
+      className="trending-sidebar"
+      >
+        {/* Resize handle for right sidebar */}
+        <div
+          onMouseDown={() => setIsResizingRight(true)}
+          style={{
+            position: 'absolute',
+            left: '-4px',
+            top: '140px',
+            bottom: 0,
+            width: '8px',
+            cursor: 'ew-resize',
+            background: 'transparent',
+            zIndex: 1000
+          }}
+          title="Drag to resize"
+        />
+        {/* Voting */}
+        <VotingPanel
+          debateId={debateId}
+          participants={participants}
+          currentUser={currentUser}
+        />
+
+        {/* Chat */}
+        <ChatPanel
+          debateId={debateId}
+          currentUser={currentUser}
+          userProfile={userProfile}
+        />
       </div>
 
       {/* Main Content */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 20px 24px 320px', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '32px' }}>
-          {/* Main Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Video */}
-            <VideoDebateRoom
-              key={debateId} // Force unmount/remount when debateId changes
-              debateId={debateId}
-              participants={participants}
-              currentUser={currentUser}
-              userProfile={userProfile}
-              debate={debate}
-            />
-          </div>
-
-          {/* Sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Voting */}
-            <VotingPanel
-              debateId={debateId}
-              participants={participants}
-              currentUser={currentUser}
-            />
-
-            {/* Chat */}
-            <ChatPanel
-              debateId={debateId}
-              currentUser={currentUser}
-              userProfile={userProfile}
-            />
-
-            {/* Actions */}
-            <div style={{
-              background: 'rgba(17, 24, 39, 0.6)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              padding: '14px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-            }}>
-              <button
-                onClick={() => navigate('/browse')}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#60a5fa',
-                  borderRadius: '10px',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ← Back to Browse
-              </button>
-            </div>
-          </div>
-        </div>
+      <div style={{
+        margin: '0 auto',
+        padding: `24px calc(${rightSidebarWidth}% + 30px) 24px calc(${isSidebarMinimized ? '50px' : leftSidebarWidth + '%'} + 30px)`,
+        position: 'relative',
+        zIndex: 1
+      }}>
+        <VideoDebateRoom
+          key={debateId}
+          debateId={debateId}
+          participants={participants}
+          currentUser={currentUser}
+          userProfile={userProfile}
+          debate={debate}
+        />
       </div>
 
       {/* Join Modal */}
