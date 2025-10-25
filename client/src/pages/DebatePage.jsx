@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToDebate, joinDebate } from '../services/debateService';
 import { subscribeToParticipants, joinAsViewer, subscribeToViewerCount } from '../services/chatService';
 import { subscribeToDebateState } from '../services/debateStateService';
 import { handleDebateEnd, scheduleDebateDeletion } from '../services/debateEndService';
 import { subscribeToWaitlist, joinWaitlist, leaveWaitlist } from '../services/waitlistService';
+import { ref, onValue } from 'firebase/database';
+import { collection, onSnapshot, query, where, limit } from 'firebase/firestore';
+import { rtdb, db } from '../services/firebase';
 import ChatPanel from '../components/debate/ChatPanel';
 import VotingPanel from '../components/debate/VotingPanel';
 import VideoDebateRoom from '../components/debate/VideoDebateRoom';
@@ -28,6 +31,48 @@ const DebatePage = () => {
   const [isOnWaitlist, setIsOnWaitlist] = useState(false);
   const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   const [waitlistStance, setWaitlistStance] = useState('');
+  const [trendingDebates, setTrendingDebates] = useState([]);
+
+  // Add pulse animation CSS for Join button and scrollbar styling
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes joinButtonPulse {
+        0%, 100% {
+          box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+        }
+        50% {
+          box-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
+        }
+      }
+
+      /* Custom scrollbar for trending sidebar */
+      .trending-sidebar::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .trending-sidebar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .trending-sidebar::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.3);
+        border-radius: 4px;
+      }
+
+      .trending-sidebar::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.5);
+      }
+
+      /* Firefox scrollbar */
+      .trending-sidebar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   const debaterA = participants.debater_a;
   const debaterB = participants.debater_b;
@@ -122,6 +167,54 @@ const DebatePage = () => {
     
     handleEnd();
   }, [debateState?.debateEnded, debateId, debate?.status]);
+
+  // Fetch trending debates
+  useEffect(() => {
+    const debatesQuery = query(
+      collection(db, 'debates'),
+      where('status', 'in', ['waiting', 'active']),
+      limit(15)
+    );
+
+    const unsubDebates = onSnapshot(debatesQuery, (snapshot) => {
+      const debatesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        viewerCount: 0
+      }));
+
+      // Subscribe to viewer counts for each debate
+      const viewerUnsubscribes = [];
+      debatesData.forEach(deb => {
+        const viewersRef = ref(rtdb, `activeViewers/${deb.id}`);
+        const unsub = onValue(viewersRef, (snap) => {
+          const viewers = snap.val();
+          const count = viewers ? Object.keys(viewers).length : 0;
+
+          setTrendingDebates(prev => {
+            const updated = prev.map(d =>
+              d.id === deb.id ? { ...d, viewerCount: count } : d
+            );
+            // If debate doesn't exist yet, add it
+            if (!prev.find(d => d.id === deb.id)) {
+              updated.push({ ...deb, viewerCount: count });
+            }
+            // Sort by viewer count and take top 10
+            return updated
+              .sort((a, b) => b.viewerCount - a.viewerCount)
+              .slice(0, 10); // Keep current debate in list
+          });
+        });
+        viewerUnsubscribes.push(unsub);
+      });
+
+      return () => {
+        viewerUnsubscribes.forEach(unsub => unsub());
+      };
+    });
+
+    return () => unsubDebates();
+  }, [debateId]);
 
   const handleJoinDebate = async () => {
     if (!currentUser) {
@@ -264,10 +357,11 @@ const DebatePage = () => {
       {/* Header */}
       <div style={{
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        backdropFilter: 'blur(10px)',
-        background: 'rgba(17, 24, 39, 0.5)',
-        position: 'relative',
-        zIndex: 10
+        backdropFilter: 'blur(20px)',
+        background: 'rgba(17, 24, 39, 0.95)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px 32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -298,22 +392,32 @@ const DebatePage = () => {
                   {debate.category}
                 </span>
                 <span style={{ opacity: 0.5 }}>•</span>
-                <span style={{
-                  padding: '3px 10px',
-                  background: debate.structure === 'self-moderated'
-                    ? 'rgba(16, 185, 129, 0.15)'
-                    : debate.structure === 'auto-moderated'
-                    ? 'rgba(147, 51, 234, 0.15)'
-                    : 'rgba(251, 191, 36, 0.15)',
-                  borderRadius: '6px',
-                  color: debate.structure === 'self-moderated'
-                    ? '#10b981'
-                    : debate.structure === 'auto-moderated'
-                    ? '#a78bfa'
-                    : '#fbbf24',
-                  fontWeight: '600',
-                  fontSize: '12px'
-                }}>
+                <span
+                  title={
+                    debate.structure === 'moderated'
+                      ? 'A third-party moderator controls the debate flow and can pause/resume turns'
+                      : debate.structure === 'auto-moderated'
+                      ? 'The system automatically manages turn switching with no human moderator'
+                      : 'Debaters control their own turns and can switch whenever ready'
+                  }
+                  style={{
+                    padding: '3px 10px',
+                    background: debate.structure === 'self-moderated'
+                      ? 'rgba(16, 185, 129, 0.15)'
+                      : debate.structure === 'auto-moderated'
+                      ? 'rgba(147, 51, 234, 0.15)'
+                      : 'rgba(251, 191, 36, 0.15)',
+                    borderRadius: '6px',
+                    color: debate.structure === 'self-moderated'
+                      ? '#10b981'
+                      : debate.structure === 'auto-moderated'
+                      ? '#a78bfa'
+                      : '#fbbf24',
+                    fontWeight: '600',
+                    fontSize: '12px',
+                    cursor: 'help'
+                  }}
+                >
                   {debate.structure === 'self-moderated' ? '👥 Self-Moderated' :
                    debate.structure === 'auto-moderated' ? '🤖 Auto-Moderated' :
                    '👨‍⚖️ 3rd Party Moderator'}
@@ -355,11 +459,12 @@ const DebatePage = () => {
                     borderRadius: '10px',
                     fontWeight: '700',
                     fontSize: '13px',
-                    border: 'none',
+                    border: '2px solid rgba(96, 165, 250, 1)',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+                    boxShadow: '0 0 25px rgba(59, 130, 246, 0.5)',
                     transition: 'all 0.3s ease',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    animation: 'joinButtonPulse 2s ease-in-out infinite'
                   }}
                 >
                   {(!debaterA || !debaterB) ? '🎯 Join Debate' : '🎯 Join as Moderator'}
@@ -445,9 +550,148 @@ const DebatePage = () => {
         </div>
       </div>
 
+      {/* Trending Debates Sidebar - Fixed to left edge */}
+      <div style={{
+        position: 'fixed',
+        left: '20px',
+        top: '90px',
+        width: '260px',
+        background: 'rgba(17, 24, 39, 0.6)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        padding: '20px',
+        maxHeight: 'calc(100vh - 110px)',
+        overflowY: 'auto',
+        zIndex: 100
+      }}
+      className="trending-sidebar"
+      >
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: '700',
+              color: '#fff',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              🔥 Trending
+            </h3>
+
+            {trendingDebates.length === 0 ? (
+              <p style={{ color: '#64748b', fontSize: '13px', fontStyle: 'italic' }}>
+                No active debates right now
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {trendingDebates.map((tDebate, index) => {
+                  const isCurrentDebate = tDebate.id === debateId;
+                  return (
+                  <Link
+                    key={tDebate.id}
+                    to={`/debate/${tDebate.id}`}
+                    style={{
+                      textDecoration: 'none',
+                      padding: '12px',
+                      background: isCurrentDebate
+                        ? 'rgba(59, 130, 246, 0.15)'
+                        : 'rgba(31, 41, 55, 0.6)',
+                      borderRadius: '10px',
+                      border: isCurrentDebate
+                        ? '2px solid rgba(59, 130, 246, 0.5)'
+                        : '1px solid rgba(255, 255, 255, 0.05)',
+                      transition: 'all 0.2s ease',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isCurrentDebate) {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                        e.currentTarget.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isCurrentDebate) {
+                        e.currentTarget.style.background = 'rgba(31, 41, 55, 0.6)';
+                        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: '#64748b',
+                        minWidth: '20px'
+                      }}>
+                        #{index + 1}
+                      </span>
+                      {tDebate.status === 'active' && (
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          background: '#ef4444',
+                          borderRadius: '50%',
+                          animation: 'pulse 2s infinite'
+                        }}></span>
+                      )}
+                    </div>
+
+                    <h4 style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#e2e8f0',
+                      marginBottom: '8px',
+                      lineHeight: '1.3',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical'
+                    }}>
+                      {tDebate.title}
+                    </h4>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '6px'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '12px',
+                        color: '#94a3b8',
+                        fontWeight: '600'
+                      }}>
+                        <span>👁️</span>
+                        <span>{tDebate.viewerCount} watching</span>
+                      </div>
+                      {isCurrentDebate && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          color: '#60a5fa',
+                          background: 'rgba(59, 130, 246, 0.2)',
+                          padding: '2px 6px',
+                          borderRadius: '4px'
+                        }}>
+                          YOU'RE HERE
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                  );
+                })}
+              </div>
+            )}
+      </div>
+
       {/* Main Content */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 32px', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 20px 24px 320px', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '32px' }}>
           {/* Main Column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Video */}

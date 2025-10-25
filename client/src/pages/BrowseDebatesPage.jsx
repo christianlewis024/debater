@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { subscribeToDebates } from '../services/debateService';
 import { ref, onValue } from 'firebase/database';
-import { rtdb } from '../services/firebase';
+import { rtdb, db } from '../services/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const BrowseDebatesPage = () => {
   const [debates, setDebates] = useState([]);
@@ -10,7 +11,27 @@ const BrowseDebatesPage = () => {
   const [error, setError] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [needsDebatersFilter, setNeedsDebatersFilter] = useState(false);
   const [viewerCounts, setViewerCounts] = useState({}); // Track viewer counts for all debates
+  const [debateParticipants, setDebateParticipants] = useState({}); // Track participants for all debates
+
+  // Add pulse animation CSS
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes pulse {
+        0%, 100% {
+          box-shadow: 0 0 20px rgba(234, 179, 8, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 30px rgba(234, 179, 8, 0.6);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   const categories = [
     'all',
@@ -82,6 +103,75 @@ const BrowseDebatesPage = () => {
       unsubscribes.forEach(unsub => unsub());
     };
   }, [debates]);
+
+  // Subscribe to participants for all debates
+  useEffect(() => {
+    if (debates.length === 0) return;
+
+    const unsubscribes = [];
+
+    debates.forEach(debate => {
+      const participantsRef = collection(db, `debates/${debate.id}/participants`);
+
+      const unsubscribe = onSnapshot(participantsRef, (snapshot) => {
+        const participants = {};
+        snapshot.forEach(doc => {
+          participants[doc.id] = doc.data();
+        });
+
+        setDebateParticipants(prev => ({
+          ...prev,
+          [debate.id]: participants
+        }));
+      });
+
+      unsubscribes.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [debates]);
+
+  // Filter debates based on search query and needsDebaters filter
+  const filteredDebates = debates.filter(debate => {
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const participants = debateParticipants[debate.id] || {};
+
+      const matchesTitle = debate.title?.toLowerCase().includes(query);
+      const matchesHost = debate.hostUsername?.toLowerCase().includes(query);
+      const matchesProDebater = participants.debater_a?.username?.toLowerCase().includes(query);
+      const matchesConDebater = participants.debater_b?.username?.toLowerCase().includes(query);
+      const matchesModerator = participants.moderator?.username?.toLowerCase().includes(query);
+
+      if (!matchesTitle && !matchesHost && !matchesProDebater && !matchesConDebater && !matchesModerator) {
+        return false;
+      }
+    }
+
+    // Needs debaters filter
+    if (needsDebatersFilter) {
+      const participants = debateParticipants[debate.id] || {};
+      const hasDebaterA = participants.debater_a?.userId;
+      const hasDebaterB = participants.debater_b?.userId;
+      const hasModerator = participants.moderator?.userId;
+
+      // Only show debates that are waiting and missing at least one role
+      if (debate.status !== 'waiting') return false;
+
+      if (debate.structure === 'moderated') {
+        // Needs at least one debater or moderator
+        if (hasDebaterA && hasDebaterB && hasModerator) return false;
+      } else {
+        // Needs at least one debater
+        if (hasDebaterA && hasDebaterB) return false;
+      }
+    }
+
+    return true;
+  });
 
   // Format timestamp with full date/time for older debates
   const formatTimestamp = (timestamp) => {
@@ -183,7 +273,7 @@ const BrowseDebatesPage = () => {
           Browse Klashes
         </h1>
 
-        {/* Filters */}
+        {/* Search and Filters */}
         <div style={{
           background: 'rgba(17, 24, 39, 0.6)',
           backdropFilter: 'blur(20px)',
@@ -193,6 +283,40 @@ const BrowseDebatesPage = () => {
           marginBottom: '32px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
         }}>
+          {/* Search Bar */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#e2e8f0',
+              marginBottom: '10px',
+              letterSpacing: '0.02em'
+            }}>
+              Search
+            </label>
+            <input
+              type="text"
+              placeholder="Search by topic, host, or debater name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '14px 18px',
+                background: 'rgba(31, 41, 55, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                color: '#fff',
+                fontSize: '15px',
+                fontWeight: '500',
+                fontFamily: "'Inter', sans-serif",
+                outline: 'none'
+              }}
+              onFocus={(e) => e.target.style.border = '1px solid rgba(59, 130, 246, 0.5)'}
+              onBlur={(e) => e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)'}
+            />
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
             {/* Category Filter */}
             <div>
@@ -265,6 +389,45 @@ const BrowseDebatesPage = () => {
               </select>
             </div>
           </div>
+
+          {/* Needs Debaters Toggle */}
+          <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setNeedsDebatersFilter(!needsDebatersFilter)}
+              style={{
+                padding: '12px 24px',
+                background: needsDebatersFilter
+                  ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                  : 'rgba(255, 255, 255, 0.05)',
+                color: needsDebatersFilter ? '#fff' : '#94a3b8',
+                borderRadius: '12px',
+                border: needsDebatersFilter ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                fontWeight: '700',
+                fontSize: '14px',
+                cursor: 'pointer',
+                fontFamily: "'Inter', sans-serif",
+                boxShadow: needsDebatersFilter ? '0 4px 15px rgba(59, 130, 246, 0.4)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!needsDebatersFilter) {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!needsDebatersFilter) {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                }
+              }}
+            >
+              {needsDebatersFilter ? '✓ ' : ''}Needs Debaters
+            </button>
+            {needsDebatersFilter && (
+              <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>
+                Showing debates with open spots
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Error */}
@@ -292,7 +455,7 @@ const BrowseDebatesPage = () => {
         )}
 
         {/* No debates */}
-        {!loading && !error && debates.length === 0 && (
+        {!loading && !error && filteredDebates.length === 0 && debates.length === 0 && (
           <div style={{
             textAlign: 'center',
             padding: '80px 20px',
@@ -323,10 +486,43 @@ const BrowseDebatesPage = () => {
           </div>
         )}
 
+        {/* No filtered results */}
+        {!loading && !error && filteredDebates.length === 0 && debates.length > 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            background: 'rgba(17, 24, 39, 0.6)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+          }}>
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔍</div>
+            <p style={{ color: '#94a3b8', fontSize: '16px', fontWeight: '600' }}>No debates match your filters</p>
+            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '8px' }}>Try adjusting your search or filters</p>
+          </div>
+        )}
+
         {/* Debates Grid */}
-        {!loading && !error && debates.length > 0 && (
+        {!loading && !error && filteredDebates.length > 0 && (
           <div style={{ display: 'grid', gap: '24px' }}>
-            {debates.map(debate => (
+            {filteredDebates.map(debate => {
+              const participants = debateParticipants[debate.id] || {};
+              const hasDebaterA = participants.debater_a?.userId;
+              const hasDebaterB = participants.debater_b?.userId;
+              const hasModerator = participants.moderator?.userId;
+
+              // Determine if debate is open
+              let isOpen = false;
+              if (debate.status === 'waiting') {
+                if (debate.structure === 'moderated') {
+                  isOpen = !hasDebaterA || !hasDebaterB || !hasModerator;
+                } else {
+                  isOpen = !hasDebaterA || !hasDebaterB;
+                }
+              }
+
+              return (
               <Link
                 key={debate.id}
                 to={`/debate/${debate.id}`}
@@ -381,14 +577,24 @@ const BrowseDebatesPage = () => {
                       {debate.structure && (
                         <>
                           <span style={{ opacity: 0.5 }}>•</span>
-                          <span style={{
-                            padding: '4px 12px',
-                            background: 'rgba(147, 51, 234, 0.15)',
-                            borderRadius: '8px',
-                            color: '#a78bfa',
-                            fontWeight: '600',
-                            fontSize: '13px'
-                          }}>
+                          <span
+                            title={
+                              debate.structure === 'moderated'
+                                ? 'A third-party moderator controls the debate flow and can pause/resume turns'
+                                : debate.structure === 'auto-moderated'
+                                ? 'The system automatically manages turn switching with no human moderator'
+                                : 'Debaters control their own turns and can switch whenever ready'
+                            }
+                            style={{
+                              padding: '4px 12px',
+                              background: 'rgba(147, 51, 234, 0.15)',
+                              borderRadius: '8px',
+                              color: '#a78bfa',
+                              fontWeight: '600',
+                              fontSize: '13px',
+                              cursor: 'help'
+                            }}
+                          >
                             {debate.structure === 'moderated' && '👤 Moderated'}
                             {debate.structure === 'auto-moderated' && '⚙️ Auto'}
                             {debate.structure === 'self-moderated' && '🎙️ Self'}
@@ -397,7 +603,215 @@ const BrowseDebatesPage = () => {
                       )}
                     </div>
                   </div>
-                  {getStatusBadge(debate.status)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                    {getStatusBadge(debate.status)}
+                    {isOpen && (
+                      <span style={{
+                        padding: '6px 16px',
+                        borderRadius: '10px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        background: 'rgba(34, 197, 94, 0.2)',
+                        color: '#22c55e',
+                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                        letterSpacing: '0.05em'
+                      }}>
+                        🟢 OPEN
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Participants Section */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: debate.structure === 'moderated' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+                  gap: '16px',
+                  marginBottom: '20px',
+                  marginTop: '20px'
+                }}>
+                  {/* PRO Debater */}
+                  <div style={{
+                    padding: '12px 16px',
+                    background: hasDebaterA
+                      ? 'rgba(59, 130, 246, 0.1)'
+                      : 'rgba(234, 179, 8, 0.15)',
+                    borderRadius: '12px',
+                    border: hasDebaterA
+                      ? '1px solid rgba(59, 130, 246, 0.3)'
+                      : '2px solid rgba(234, 179, 8, 0.6)',
+                    boxShadow: hasDebaterA
+                      ? 'none'
+                      : '0 0 20px rgba(234, 179, 8, 0.3)',
+                    animation: hasDebaterA ? 'none' : 'pulse 2s ease-in-out infinite',
+                  }}>
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: '#94a3b8',
+                      marginBottom: '6px',
+                      letterSpacing: '0.05em'
+                    }}>
+                      👍 PRO
+                    </div>
+                    {hasDebaterA ? (
+                      <div>
+                        <div style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: '#60a5fa',
+                          marginBottom: '4px'
+                        }}>
+                          {participants.debater_a.profileData?.username || participants.debater_a.username}
+                        </div>
+                        {participants.debater_a.sideDescription && (
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            color: '#94a3b8',
+                            lineHeight: '1.4'
+                          }}>
+                            "{participants.debater_a.sideDescription}"
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        color: '#eab308',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ fontSize: '18px' }}>✨</span>
+                        JOIN NOW!
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CON Debater */}
+                  <div style={{
+                    padding: '12px 16px',
+                    background: hasDebaterB
+                      ? 'rgba(239, 68, 68, 0.1)'
+                      : 'rgba(234, 179, 8, 0.15)',
+                    borderRadius: '12px',
+                    border: hasDebaterB
+                      ? '1px solid rgba(239, 68, 68, 0.3)'
+                      : '2px solid rgba(234, 179, 8, 0.6)',
+                    boxShadow: hasDebaterB
+                      ? 'none'
+                      : '0 0 20px rgba(234, 179, 8, 0.3)',
+                    animation: hasDebaterB ? 'none' : 'pulse 2s ease-in-out infinite',
+                  }}>
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: '#94a3b8',
+                      marginBottom: '6px',
+                      letterSpacing: '0.05em'
+                    }}>
+                      👎 CON
+                    </div>
+                    {hasDebaterB ? (
+                      <div>
+                        <div style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: '#f87171',
+                          marginBottom: '4px'
+                        }}>
+                          {participants.debater_b.profileData?.username || participants.debater_b.username}
+                        </div>
+                        {participants.debater_b.sideDescription && (
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            color: '#94a3b8',
+                            lineHeight: '1.4',
+                            marginBottom: debate.structure === 'self-moderated' ? '6px' : '0'
+                          }}>
+                            "{participants.debater_b.sideDescription}"
+                          </div>
+                        )}
+                        {debate.structure === 'self-moderated' && (
+                          <div style={{
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: '#22c55e',
+                            marginTop: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            Waitlist ✓
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        color: '#eab308',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ fontSize: '18px' }}>✨</span>
+                        JOIN NOW!
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Moderator (only for moderated debates) */}
+                  {debate.structure === 'moderated' && (
+                    <div style={{
+                      padding: '12px 16px',
+                      background: hasModerator
+                        ? 'rgba(147, 51, 234, 0.1)'
+                        : 'rgba(234, 179, 8, 0.15)',
+                      borderRadius: '12px',
+                      border: hasModerator
+                        ? '1px solid rgba(147, 51, 234, 0.3)'
+                        : '2px solid rgba(234, 179, 8, 0.6)',
+                      boxShadow: hasModerator
+                        ? 'none'
+                        : '0 0 20px rgba(234, 179, 8, 0.3)',
+                      animation: hasModerator ? 'none' : 'pulse 2s ease-in-out infinite',
+                    }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: '#94a3b8',
+                        marginBottom: '6px',
+                        letterSpacing: '0.05em'
+                      }}>
+                        👤 MODERATOR
+                      </div>
+                      {hasModerator ? (
+                        <div style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: '#a78bfa'
+                        }}>
+                          {participants.moderator.profileData?.username || participants.moderator.username}
+                        </div>
+                      ) : (
+                        <div style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: '#eab308',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{ fontSize: '18px' }}>✨</span>
+                          JOIN NOW!
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '32px', fontSize: '15px', flexWrap: 'wrap' }}>
@@ -421,7 +835,8 @@ const BrowseDebatesPage = () => {
                   </div>
                 </div>
               </Link>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

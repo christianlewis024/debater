@@ -6,6 +6,7 @@ const ChatPanel = ({ debateId, currentUser, userProfile }) => {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!debateId) return;
@@ -23,22 +24,36 @@ const ChatPanel = ({ debateId, currentUser, userProfile }) => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    
+    e.stopPropagation();
+
     if (!newMessage.trim() || !currentUser) return;
+
+    // Store reference to input before async operations
+    const inputElement = inputRef.current;
 
     try {
       setSending(true);
-      await sendChatMessage(
+
+      // Send message without awaiting to avoid focus loss
+      sendChatMessage(
         debateId,
         currentUser.uid,
         userProfile?.username || 'Anonymous',
         newMessage.trim()
-      );
+      ).catch(error => {
+        console.error('Error sending message:', error);
+      });
+
+      // Clear immediately and refocus
       setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
+
     } finally {
       setSending(false);
+    }
+
+    // Refocus immediately using the stored reference
+    if (inputElement) {
+      inputElement.focus();
     }
   };
 
@@ -169,6 +184,7 @@ const ChatPanel = ({ debateId, currentUser, userProfile }) => {
         {currentUser ? (
           <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '12px' }}>
             <input
+              ref={inputRef}
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}

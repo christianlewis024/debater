@@ -29,6 +29,10 @@ const VideoDebateRoom = ({
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [remoteSpeaking, setRemoteSpeaking] = useState({});
 
+  // Personal audio controls (per user)
+  const [personalMutes, setPersonalMutes] = useState({}); // { userId: boolean }
+  const [personalVolumes, setPersonalVolumes] = useState({}); // { userId: number (0-100) }
+
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -146,6 +150,10 @@ const VideoDebateRoom = ({
         if (mediaType === 'audio' && user.audioTrack) {
           try {
             await user.audioTrack.play();
+
+            // Apply personal audio settings for this user
+            const userId = String(user.uid);
+            applyPersonalAudioSettings(user, userId);
           } catch (audioError) {
             setAudioBlocked(true);
           }
@@ -551,10 +559,51 @@ const VideoDebateRoom = ({
     });
   }, [remoteUsers]);
 
+  // Apply personal audio settings whenever they change
+  useEffect(() => {
+    remoteUsers.forEach(user => {
+      const userId = String(user.uid);
+      if (user.audioTrack) {
+        applyPersonalAudioSettings(user, userId);
+      }
+    });
+  }, [personalMutes, personalVolumes, remoteUsers]);
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Personal audio control functions
+  const togglePersonalMute = (userId) => {
+    setPersonalMutes(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
+  const setPersonalVolume = (userId, volume) => {
+    setPersonalVolumes(prev => ({
+      ...prev,
+      [userId]: volume
+    }));
+  };
+
+  // Apply personal audio settings to a user's audio track
+  const applyPersonalAudioSettings = (user, userId) => {
+    if (!user.audioTrack) return;
+
+    const isMuted = personalMutes[userId] || false;
+    const volume = personalVolumes[userId] !== undefined ? personalVolumes[userId] : 100;
+
+    // For remote tracks, we control volume directly (0 = muted)
+    // If user wants to mute, set volume to 0, otherwise use their preferred volume
+    if (isMuted) {
+      user.audioTrack.setVolume(0);
+    } else {
+      user.audioTrack.setVolume(volume);
+    }
   };
 
   const getBorderStyle = (isSpeaking, isUserTurn) => {
@@ -782,51 +831,60 @@ const VideoDebateRoom = ({
               <button
                 onClick={toggleMic}
                 disabled={(myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted}
+                title={micMuted ? "Unmute Microphone" : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? "Microphone Locked (Not Your Turn)" : "Mute Microphone"}
                 style={{
                   padding: "10px 16px",
                   borderRadius: "10px",
                   fontWeight: "600",
                   fontSize: "14px",
-                  border: "none",
+                  border: micMuted
+                    ? "2px solid #ef4444"
+                    : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted)
+                    ? "2px solid rgba(100, 116, 139, 0.5)"
+                    : "2px solid #22c55e",
                   cursor: ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? "not-allowed" : "pointer",
                   transition: "all 0.2s ease",
                   background: micMuted
-                    ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+                    ? "rgba(239, 68, 68, 0.1)"
                     : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted)
-                    ? "rgba(100, 116, 139, 0.3)"
-                    : "rgba(255, 255, 255, 0.1)",
+                    ? "rgba(100, 116, 139, 0.1)"
+                    : "rgba(34, 197, 94, 0.1)",
                   color: "#fff",
                   opacity: ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? 0.5 : 1,
                   boxShadow: micMuted
-                    ? "0 4px 15px rgba(239, 68, 68, 0.4)"
-                    : "none",
+                    ? "0 0 15px rgba(239, 68, 68, 0.3)"
+                    : "0 0 15px rgba(34, 197, 94, 0.3)",
                 }}
               >
-                {micMuted ? "🔇" : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? "🔒🎤" : "🎤"}
+                {micMuted ? "🎤❌" : ((myRole === 'debater_a' || myRole === 'debater_b') && !isMyTurn && debateState?.debateStarted) ? "🎤🔒" : "🎤✓"}
               </button>
               <button
                 onClick={toggleCamera}
+                title={cameraMuted ? "Turn Camera On" : "Turn Camera Off"}
                 style={{
                   padding: "10px 16px",
                   borderRadius: "10px",
                   fontWeight: "600",
                   fontSize: "14px",
-                  border: "none",
+                  border: cameraMuted
+                    ? "2px solid #ef4444"
+                    : "2px solid #22c55e",
                   cursor: "pointer",
                   transition: "all 0.2s ease",
                   background: cameraMuted
-                    ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
-                    : "rgba(255, 255, 255, 0.1)",
+                    ? "rgba(239, 68, 68, 0.1)"
+                    : "rgba(34, 197, 94, 0.1)",
                   color: "#fff",
                   boxShadow: cameraMuted
-                    ? "0 4px 15px rgba(239, 68, 68, 0.4)"
-                    : "none",
+                    ? "0 0 15px rgba(239, 68, 68, 0.3)"
+                    : "0 0 15px rgba(34, 197, 94, 0.3)",
                 }}
               >
-                {cameraMuted ? "📹❌" : "📹"}
+                {cameraMuted ? "📷❌" : "📷✓"}
               </button>
               <button
                 onClick={() => setShowDeviceSettings(!showDeviceSettings)}
+                title="Device Settings"
                 style={{
                   padding: "10px 16px",
                   borderRadius: "10px",
@@ -849,6 +907,7 @@ const VideoDebateRoom = ({
           {/* Expand/Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
             style={{
               padding: "10px 16px",
               borderRadius: "10px",
@@ -1080,8 +1139,10 @@ const VideoDebateRoom = ({
                         aspectRatio: "16/9",
                         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
                         transition: "all 0.3s ease",
+                        // Apply moderator border only if not speaking
+                        ...(isModeratorRole && !speaking && { border: "2px solid rgba(147, 51, 234, 0.5)" }),
+                        // Apply speaking/turn border - this will override moderator border when speaking
                         ...getBorderStyle(speaking, isTurn),
-                        ...(isModeratorRole && { border: "2px solid rgba(147, 51, 234, 0.5)" }),
                       }}
                     >
                       {participant.isLocal ? (
@@ -1252,6 +1313,84 @@ const VideoDebateRoom = ({
                         {participant.isLocal ? "You" : isModeratorRole ? "👨‍⚖️ Moderator" : "Opponent"}
                         {speaking && <span style={{ fontWeight: "800", marginLeft: "4px" }}>SPEAKING</span>}
                       </div>
+
+                      {/* Personal Audio Controls - Only for remote users */}
+                      {!participant.isLocal && participant.agoraUser?.audioTrack && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "12px",
+                            right: "12px",
+                            background: "rgba(0, 0, 0, 0.8)",
+                            backdropFilter: "blur(10px)",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px",
+                            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)"
+                          }}
+                        >
+                          {/* Mute Button */}
+                          <button
+                            onClick={() => togglePersonalMute(participant.userId)}
+                            style={{
+                              background: personalMutes[participant.userId]
+                                ? "rgba(239, 68, 68, 0.2)"
+                                : "rgba(59, 130, 246, 0.2)",
+                              border: personalMutes[participant.userId]
+                                ? "1px solid rgba(239, 68, 68, 0.5)"
+                                : "1px solid rgba(59, 130, 246, 0.5)",
+                              color: "#fff",
+                              padding: "8px 12px",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              fontSize: "14px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              transition: "all 0.2s ease"
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = personalMutes[participant.userId]
+                                ? "rgba(239, 68, 68, 0.3)"
+                                : "rgba(59, 130, 246, 0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = personalMutes[participant.userId]
+                                ? "rgba(239, 68, 68, 0.2)"
+                                : "rgba(59, 130, 246, 0.2)";
+                            }}
+                          >
+                            {personalMutes[participant.userId] ? "🔇" : "🔊"}
+                          </button>
+
+                          {/* Volume Slider */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={personalVolumes[participant.userId] ?? 100}
+                              onChange={(e) => setPersonalVolume(participant.userId, parseInt(e.target.value))}
+                              style={{
+                                width: "80px",
+                                cursor: "pointer"
+                              }}
+                            />
+                            <span style={{
+                              color: "#94a3b8",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              textAlign: "center"
+                            }}>
+                              {personalVolumes[participant.userId] ?? 100}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Debater Info Card */}

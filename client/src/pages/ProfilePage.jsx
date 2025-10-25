@@ -12,12 +12,14 @@ const ProfilePage = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // Available emoji profile pictures
+  // Available emoji profile pictures (same as AuthContext)
   const availableEmojis = [
+    '🐶', '🐱', '🦊', '🐼', '🐨',
+    '🦁', '🐯', '🐸', '🐵', '🦉',
+    '🦅', '🦆', '🐧', '🦈', '🐙',
+    '🦋', '🐝', '🐢', '🦖', '🦕',
     '😀', '😎', '🤓', '😇', '🥳',
-    '🤠', '👽', '🤖', '👾', '🦄',
-    '🐶', '🐱', '🐼', '🦊', '🐯',
-    '🦁', '🐸', '🐵', '🦉', '🦅'
+    '🤠', '👽', '🤖', '👾', '🦄'
   ];
 
   const handleUpdateProfile = async (e) => {
@@ -235,9 +237,11 @@ const ProfilePage = () => {
                 </h3>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
                   gap: '12px',
-                  marginBottom: '16px'
+                  marginBottom: '16px',
+                  maxHeight: '300px',
+                  overflowY: 'auto'
                 }}>
                   {availableEmojis.map((emoji) => (
                     <button

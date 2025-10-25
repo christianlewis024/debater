@@ -37,13 +37,13 @@ export const AuthProvider = ({ children }) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
+    // Use emoji as default profile picture
     const emoji = getRandomEmoji();
-    const photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(emoji)}&background=random&size=200&font-size=0.6`;
 
     // Update Firebase Auth profile
     await updateProfile(user, {
       displayName: username,
-      photoURL: photoURL
+      photoURL: emoji
     });
 
     // Create user profile in Firestore
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
       email: user.email,
       username: username,
       displayName: username,
-      photoURL: photoURL,
+      photoURL: emoji,
       emoji: emoji,
       bio: '',
       createdAt: new Date(),
@@ -88,7 +88,9 @@ export const AuthProvider = ({ children }) => {
     // Check if user profile exists, if not create it
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) {
-      const photoURL = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(getRandomEmoji())}&background=random&size=200&font-size=0.6`;
+      // Use emoji as fallback if no Google photo
+      const randomEmoji = getRandomEmoji();
+      const photoURL = user.photoURL || randomEmoji;
 
       const userProfileData = {
         uid: user.uid,
@@ -96,7 +98,7 @@ export const AuthProvider = ({ children }) => {
         username: user.displayName || user.email.split('@')[0],
         displayName: user.displayName || user.email.split('@')[0],
         photoURL: photoURL,
-        emoji: getRandomEmoji(),
+        emoji: randomEmoji,
         bio: '',
         createdAt: new Date(),
         updatedAt: new Date(),

@@ -3,12 +3,14 @@ import {
   castVote,
   getVoteCounts,
   hasUserVoted,
+  getUserVote,
 } from "../../services/voteService";
 
 const VotingPanel = ({ debateId, participants, currentUser }) => {
   const [voteCounts, setVoteCounts] = useState({});
   const [totalVotes, setTotalVotes] = useState(0);
   const [hasVoted, setHasVoted] = useState(false);
+  const [userVotedFor, setUserVotedFor] = useState(null);
   const [voting, setVoting] = useState(false);
   const [error, setError] = useState("");
 
@@ -35,12 +37,20 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
   const checkIfVoted = async () => {
     if (!currentUser) {
       setHasVoted(false);
+      setUserVotedFor(null);
       return;
     }
 
     try {
       const voted = await hasUserVoted(debateId, currentUser.uid);
       setHasVoted(voted);
+
+      if (voted) {
+        const votedFor = await getUserVote(debateId, currentUser.uid);
+        setUserVotedFor(votedFor);
+      } else {
+        setUserVotedFor(null);
+      }
     } catch (error) {
       console.error("Error checking vote:", error);
     }
@@ -52,16 +62,12 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
       return;
     }
 
-    if (hasVoted) {
-      setError("You have already voted");
-      return;
-    }
-
     try {
       setVoting(true);
       setError("");
       await castVote(debateId, currentUser.uid, participantId);
       setHasVoted(true);
+      setUserVotedFor(participantId);
       await loadVotes();
     } catch (error) {
       setError(error.message || "Failed to cast vote");
@@ -181,7 +187,7 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
             textAlign: "center",
           }}
         >
-          ✓ You have voted!
+          ✓ Your vote is cast! (Click to change)
         </div>
       )}
 
@@ -193,25 +199,28 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
         {debaterA && (
           <div
             onClick={() =>
-              !hasVoted && currentUser && !voting && handleVote(debaterA.id)
+              currentUser && !voting && handleVote(debaterA.id)
             }
             style={{
-              background: winningA
+              background: userVotedFor === debaterA.id
+                ? "linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.15) 100%)"
+                : winningA
                 ? "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)"
                 : "rgba(31, 41, 55, 0.5)",
-              border: winningA
+              border: userVotedFor === debaterA.id
+                ? "2px solid rgba(59, 130, 246, 0.8)"
+                : winningA
                 ? "2px solid rgba(59, 130, 246, 0.5)"
                 : "1px solid rgba(255, 255, 255, 0.1)",
               borderRadius: "12px",
               padding: "14px 10px",
-              cursor:
-                !hasVoted && currentUser && !voting ? "pointer" : "default",
+              cursor: currentUser && !voting ? "pointer" : "default",
               transition: "all 0.3s ease",
               position: "relative",
               overflow: "hidden",
             }}
             onMouseEnter={(e) => {
-              if (!hasVoted && currentUser && !voting) {
+              if (currentUser && !voting) {
                 e.currentTarget.style.transform = "scale(1.02)";
                 e.currentTarget.style.boxShadow =
                   "0 8px 30px rgba(59, 130, 246, 0.3)";
@@ -222,8 +231,29 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
+            {/* Your Vote Badge */}
+            {userVotedFor === debaterA.id && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "8px",
+                  right: "8px",
+                  background:
+                    "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                  color: "#fff",
+                  padding: "4px 10px",
+                  borderRadius: "8px",
+                  fontSize: "11px",
+                  fontWeight: "800",
+                  boxShadow: "0 4px 15px rgba(59, 130, 246, 0.4)",
+                }}
+              >
+                ✓ YOUR VOTE
+              </div>
+            )}
+
             {/* Winning Badge */}
-            {winningA && totalVotes > 0 && (
+            {winningA && totalVotes > 0 && !userVotedFor && (
               <div
                 style={{
                   position: "absolute",
@@ -328,25 +358,28 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
         {debaterB && (
           <div
             onClick={() =>
-              !hasVoted && currentUser && !voting && handleVote(debaterB.id)
+              currentUser && !voting && handleVote(debaterB.id)
             }
             style={{
-              background: winningB
+              background: userVotedFor === debaterB.id
+                ? "linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.15) 100%)"
+                : winningB
                 ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.05) 100%)"
                 : "rgba(31, 41, 55, 0.5)",
-              border: winningB
+              border: userVotedFor === debaterB.id
+                ? "2px solid rgba(239, 68, 68, 0.8)"
+                : winningB
                 ? "2px solid rgba(239, 68, 68, 0.5)"
                 : "1px solid rgba(255, 255, 255, 0.1)",
               borderRadius: "12px",
               padding: "14px 10px",
-              cursor:
-                !hasVoted && currentUser && !voting ? "pointer" : "default",
+              cursor: currentUser && !voting ? "pointer" : "default",
               transition: "all 0.3s ease",
               position: "relative",
               overflow: "hidden",
             }}
             onMouseEnter={(e) => {
-              if (!hasVoted && currentUser && !voting) {
+              if (currentUser && !voting) {
                 e.currentTarget.style.transform = "scale(1.02)";
                 e.currentTarget.style.boxShadow =
                   "0 8px 30px rgba(239, 68, 68, 0.3)";
@@ -357,8 +390,29 @@ const VotingPanel = ({ debateId, participants, currentUser }) => {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
+            {/* Your Vote Badge */}
+            {userVotedFor === debaterB.id && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "8px",
+                  right: "8px",
+                  background:
+                    "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                  color: "#fff",
+                  padding: "4px 10px",
+                  borderRadius: "8px",
+                  fontSize: "11px",
+                  fontWeight: "800",
+                  boxShadow: "0 4px 15px rgba(239, 68, 68, 0.4)",
+                }}
+              >
+                ✓ YOUR VOTE
+              </div>
+            )}
+
             {/* Winning Badge */}
-            {winningB && totalVotes > 0 && (
+            {winningB && totalVotes > 0 && !userVotedFor && (
               <div
                 style={{
                   position: "absolute",

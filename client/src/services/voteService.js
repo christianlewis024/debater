@@ -7,27 +7,45 @@ import {
   getDocs,
   query,
   where,
-  serverTimestamp
+  serverTimestamp,
+  setDoc,
+  deleteDoc
 } from 'firebase/firestore';
 
-// Cast a vote
+// Cast or change a vote
 export const castVote = async (debateId, userId, participantId) => {
   try {
     // Check if user already voted
     const votesRef = collection(db, `debates/${debateId}/votes`);
     const q = query(votesRef, where('userId', '==', userId));
     const existingVotes = await getDocs(q);
-    
+
     if (!existingVotes.empty) {
-      throw new Error('You have already voted in this debate');
+      // User has already voted - update their vote
+      const existingVoteDoc = existingVotes.docs[0];
+      const existingVoteId = existingVoteDoc.id;
+      const existingParticipantId = existingVoteDoc.data().participantId;
+
+      // If voting for the same person, do nothing
+      if (existingParticipantId === participantId) {
+        return;
+      }
+
+      // Delete old vote and create new one
+      await deleteDoc(doc(db, `debates/${debateId}/votes`, existingVoteId));
+      await addDoc(votesRef, {
+        userId,
+        participantId,
+        votedAt: serverTimestamp()
+      });
+    } else {
+      // First time voting - add vote
+      await addDoc(votesRef, {
+        userId,
+        participantId,
+        votedAt: serverTimestamp()
+      });
     }
-    
-    // Add vote
-    await addDoc(votesRef, {
-      userId,
-      participantId,
-      votedAt: serverTimestamp()
-    });
   } catch (error) {
     console.error('Error casting vote:', error);
     throw error;
@@ -62,10 +80,28 @@ export const hasUserVoted = async (debateId, userId) => {
     const votesRef = collection(db, `debates/${debateId}/votes`);
     const q = query(votesRef, where('userId', '==', userId));
     const snapshot = await getDocs(q);
-    
+
     return !snapshot.empty;
   } catch (error) {
     console.error('Error checking vote:', error);
     return false;
+  }
+};
+
+// Get which participant the user voted for
+export const getUserVote = async (debateId, userId) => {
+  try {
+    const votesRef = collection(db, `debates/${debateId}/votes`);
+    const q = query(votesRef, where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return null;
+    }
+
+    return snapshot.docs[0].data().participantId;
+  } catch (error) {
+    console.error('Error getting user vote:', error);
+    return null;
   }
 };
