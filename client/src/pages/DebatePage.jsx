@@ -214,8 +214,8 @@ const DebatePage = () => {
         // Calculate winner and update stats
         await handleDebateEnd(debateId);
 
-        // Schedule deletion in 30 minutes
-        await scheduleDebateDeletion(debateId, 30);
+        // Schedule deletion in 4 hours (240 minutes)
+        await scheduleDebateDeletion(debateId, 240);
       } catch (error) {
         console.error('Error processing debate end:', error);
       }

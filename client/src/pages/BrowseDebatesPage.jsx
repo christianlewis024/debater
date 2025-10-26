@@ -61,7 +61,7 @@ const BrowseDebatesPage = () => {
 
     try {
       const unsubscribe = subscribeToDebates((debatesData) => {
-        // Filter out debates older than 24 hours
+        // Filter out debates older than 4 hours
         const recentDebates = debatesData.filter(debate => !isDebateOld(debate.createdAt));
         setDebates(recentDebates);
         setLoading(false);
@@ -207,12 +207,12 @@ const BrowseDebatesPage = () => {
     }
   };
 
-  // Check if debate is older than 24 hours
+  // Check if debate is older than 4 hours
   const isDebateOld = (timestamp) => {
     if (!timestamp) return false;
     try {
       const seconds = Math.floor((new Date() - timestamp.toDate()) / 1000);
-      return seconds > 86400; // 24 hours in seconds
+      return seconds > 14400; // 4 hours in seconds (4 * 60 * 60)
     } catch (e) {
       return false;
     }

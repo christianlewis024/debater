@@ -769,8 +769,8 @@ const VideoDebateRoom = ({
                 </button>
               )}
 
-            {/* Reset button - Only show to moderator, or host in self-moderated debates */}
-            {debateState && debateState.debateStarted && hasModeratorControls && (
+            {/* Reset button - Only show to moderator/host in self-moderated debates, and only if debate hasn't ended */}
+            {debateState && debateState.debateStarted && !debateState.debateEnded && hasModeratorControls && debate?.structure === 'self-moderated' && (
               <button
                 onClick={async () => {
                   const { updateDoc, doc } = await import("firebase/firestore");

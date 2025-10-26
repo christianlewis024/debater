@@ -447,6 +447,165 @@ const ProfilePage = () => {
             )}
           </div>
 
+          {/* Debate Stats */}
+          <div style={{
+            padding: '24px',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%)',
+            borderRadius: '16px',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            marginBottom: '24px'
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '800',
+              color: '#fff',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              🏆 Debate Statistics
+            </h3>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '16px'
+            }}>
+              {/* Total Debates */}
+              <div style={{
+                padding: '16px',
+                background: 'rgba(31, 41, 55, 0.6)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  color: '#60a5fa',
+                  marginBottom: '4px'
+                }}>
+                  {userProfile?.stats?.totalDebates || 0}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#94a3b8',
+                  letterSpacing: '0.05em'
+                }}>
+                  TOTAL DEBATES
+                </div>
+              </div>
+
+              {/* Wins */}
+              <div style={{
+                padding: '16px',
+                background: 'rgba(31, 41, 55, 0.6)',
+                borderRadius: '12px',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  color: '#10b981',
+                  marginBottom: '4px'
+                }}>
+                  {userProfile?.stats?.wins || 0}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#94a3b8',
+                  letterSpacing: '0.05em'
+                }}>
+                  WINS
+                </div>
+              </div>
+
+              {/* Losses */}
+              <div style={{
+                padding: '16px',
+                background: 'rgba(31, 41, 55, 0.6)',
+                borderRadius: '12px',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  color: '#ef4444',
+                  marginBottom: '4px'
+                }}>
+                  {userProfile?.stats?.losses || 0}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#94a3b8',
+                  letterSpacing: '0.05em'
+                }}>
+                  LOSSES
+                </div>
+              </div>
+
+              {/* Win Rate */}
+              <div style={{
+                padding: '16px',
+                background: 'rgba(31, 41, 55, 0.6)',
+                borderRadius: '12px',
+                border: '1px solid rgba(147, 51, 234, 0.3)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  color: '#a78bfa',
+                  marginBottom: '4px'
+                }}>
+                  {userProfile?.stats?.totalDebates > 0
+                    ? Math.round((userProfile.stats.wins / userProfile.stats.totalDebates) * 100)
+                    : 0}%
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#94a3b8',
+                  letterSpacing: '0.05em'
+                }}>
+                  WIN RATE
+                </div>
+              </div>
+
+              {/* Total Votes Received */}
+              <div style={{
+                padding: '16px',
+                background: 'rgba(31, 41, 55, 0.6)',
+                borderRadius: '12px',
+                border: '1px solid rgba(251, 191, 36, 0.3)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  color: '#fbbf24',
+                  marginBottom: '4px'
+                }}>
+                  {userProfile?.stats?.totalVotesReceived || 0}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#94a3b8',
+                  letterSpacing: '0.05em'
+                }}>
+                  VOTES EARNED
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Account Info */}
           <div style={{
             padding: '24px',
@@ -462,7 +621,7 @@ const ProfilePage = () => {
             }}>
               Account Information
             </h3>
-            
+
             <div style={{ marginBottom: '12px' }}>
               <span style={{ color: '#94a3b8', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Email</span>
               <span style={{ color: '#e2e8f0', fontSize: '15px', fontWeight: '500' }}>{currentUser.email}</span>
@@ -470,9 +629,9 @@ const ProfilePage = () => {
 
             <div style={{ marginBottom: '12px' }}>
               <span style={{ color: '#94a3b8', fontSize: '13px', display: 'block', marginBottom: '4px' }}>User ID</span>
-              <span style={{ 
-                color: '#64748b', 
-                fontSize: '13px', 
+              <span style={{
+                color: '#64748b',
+                fontSize: '13px',
                 fontFamily: 'monospace',
                 padding: '4px 8px',
                 background: 'rgba(0, 0, 0, 0.3)',
@@ -486,10 +645,10 @@ const ProfilePage = () => {
             <div>
               <span style={{ color: '#94a3b8', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Account Created</span>
               <span style={{ color: '#e2e8f0', fontSize: '15px', fontWeight: '500' }}>
-                {new Date(currentUser.metadata.creationTime).toLocaleDateString('en-US', { 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                {new Date(currentUser.metadata.creationTime).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
                 })}
               </span>
             </div>
